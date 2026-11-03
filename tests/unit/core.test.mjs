@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import * as D from '../../js/dates.js';
 import { parseName, compareNames } from '../../js/names.js';
 import { itemsDue, agenda, cycleLabel, endLabel, partitionByStatus, monthDaysFor } from '../../js/schedule.js';
-import { parseList, parseWeekly, parseMonthly, parseDated, matchDateLine, matchWeekdayHeader } from '../../js/importer.js';
+import { parseList, parseWeekly, parseMonthly, parseDated, matchDateLine, matchWeekdayHeader, splitClergy } from '../../js/importer.js';
 import { easter, adventSunday, season } from '../../js/liturgy.js';
 
 // ---------- dates ----------
@@ -195,9 +195,9 @@ test('parseMonthly: numbered days, extra lines for the same day, and plain seque
   const numbered = parseMonthly('Diocesan Cycle of Prayer 2026\n1 The Bishop and staff\n2. St Paul’s, Anytown\nGrace Church, Elsewhere\nDay 3: Christ Church\n31) St Mark’s\n4\tTrinity\tThe Rev. Ann Lee');
   assert.equal(numbered.numbered, true);
   assert.equal(numbered.overflow, 1);
-  assert.deepEqual(numbered.entries.map((e) => [e.day, e.text]), [
-    [1, 'The Bishop and staff'], [2, 'St Paul’s, Anytown'], [2, 'Grace Church, Elsewhere'],
-    [3, 'Christ Church'], [31, 'St Mark’s'], [4, 'Trinity — The Rev. Ann Lee'],
+  assert.deepEqual(numbered.entries.map((e) => [e.day, e.text, e.note]), [
+    [1, 'The Bishop and staff', undefined], [2, 'St Paul’s, Anytown', undefined], [2, 'Grace Church, Elsewhere', undefined],
+    [3, 'Christ Church', undefined], [31, 'St Mark’s', undefined], [4, 'Trinity', 'The Rev. Ann Lee'],
   ]);
   const seq = parseMonthly('A\nB\nC');
   assert.equal(seq.numbered, false);
@@ -302,4 +302,18 @@ test('liturgical calendar', () => {
   assert.equal(name('2027-05-17'), 'Season after Pentecost');
   assert.equal(season('2026-11-29').color, 'blue');
   assert.equal(season('2027-03-01').color, 'violet');
+});
+
+test('clergy go in the details, so they can be changed', () => {
+  assert.deepEqual(splitClergy('St Paul’s, Anytown — The Rev. Jane Doe'), { text: 'St Paul’s, Anytown', note: 'The Rev. Jane Doe' });
+  assert.deepEqual(splitClergy('Christ Church, Riverside: The Very Rev. Canon John Smith'), { text: 'Christ Church, Riverside', note: 'The Very Rev. Canon John Smith' });
+  assert.deepEqual(splitClergy('Grace Church, Elsewhere, The Rev. Ann Lee and the Rev. Bo Chen'), { text: 'Grace Church, Elsewhere', note: 'The Rev. Ann Lee and the Rev. Bo Chen' });
+  assert.deepEqual(splitClergy('St Mary’s - Downtown'), { text: 'St Mary’s - Downtown' });
+  assert.deepEqual(splitClergy('The Bishop and diocesan staff'), { text: 'The Bishop and diocesan staff' });
+  const m = parseMonthly('1 St Andrew’s, Alpha\nThe Rev. A. Priest\n2 St Barnabas, Beta — Mtr. B. Priest\nSt Clement’s, Gamma');
+  assert.deepEqual(m.entries, [
+    { day: 1, text: 'St Andrew’s, Alpha', note: 'The Rev. A. Priest' },
+    { day: 2, text: 'St Barnabas, Beta', note: 'Mtr. B. Priest' },
+    { day: 2, text: 'St Clement’s, Gamma' },
+  ]);
 });

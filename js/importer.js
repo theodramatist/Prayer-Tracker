@@ -100,6 +100,26 @@ export function parseWeekly(text) {
 
 const DAY_LINE_RE = /^(?:day\s+)?(\d{1,2})(?:st|nd|rd|th)?(?:\s*[.):\-–—]\s*|\s+|$)(.*)$/i;
 
+// Words that begin a clergy name: "The Rev. Jane Doe", "Fr. John", "The Very Rev. Canon …".
+const CLERGY_RE = /^(?:the\s+)?(?:(?:rt\.?|right|very|most|ven\.?|venerable)\s+)?(?:rev(?:d|\.)?|reverend|canon|fr\.?|father|mtr\.?|mother|dcn\.?|deacon|dn\.?|bishop|bp\.?|archdeacon|dean|vicar|rector|priest-in-charge|chaplain|sr\.?|sister|br\.?|brother)(?=[\s.,]|$)/i;
+
+/**
+ * Split a church from its clergy, so the clergy show (and can be changed) in the
+ * entry's details: "St Paul's, Anytown — The Rev. Jane Doe" → text + note.
+ * Leaves anything else as it is.
+ */
+export function splitClergy(line) {
+  const sep = line.match(/^(.+?)(?:\s+[—–-]\s+|:\s+|;\s+)(.+)$/);
+  if (sep && CLERGY_RE.test(sep[2].trim())) return { text: sep[1].trim(), note: sep[2].trim() };
+  const comma = line.match(/^(.+?),\s*(.+)$/);
+  if (comma) {
+    // Only the last comma-separated part can be the clergy ("St Paul's, Anytown, The Rev. …").
+    const i = line.search(/,\s*(?:the\s+)?(?:(?:rt\.?|very|most|ven\.?)\s+)?(?:rev|revd|reverend|canon|fr|mtr|dcn|deacon)\b/i);
+    if (i > 0) return { text: line.slice(0, i).trim(), note: line.slice(i + 1).trim() };
+  }
+  return { text: line };
+}
+
 /**
  * Entries for a monthly list.
  * Lines that start with a day number ("2 St Paul's") set the day; following
@@ -116,7 +136,7 @@ export function parseMonthly(text) {
   const entries = [];
   if (!numbered) {
     lines.map(stripBullet).forEach((t, i) => {
-      if (i < 31 && t) entries.push({ day: i + 1, text: t });
+      if (i < 31 && t) entries.push({ day: i + 1, ...splitClergy(t) });
     });
     return { entries, overflow: Math.max(0, lines.length - 31), numbered };
   }
@@ -127,12 +147,16 @@ export function parseMonthly(text) {
     if (m && +m[1] >= 1 && +m[1] <= 31) {
       day = +m[1];
       const rest = m[2].replace(/^[\s—–-]+/, '').trim();
-      if (rest) entries.push({ day, text: rest });
+      if (rest) entries.push({ day, ...splitClergy(rest) });
       continue;
     }
     if (day == null) { overflow++; continue; } // a title line before day 1
     const t = stripBullet(line);
-    if (t) entries.push({ day, text: t });
+    if (!t) continue;
+    // A line of clergy on its own belongs to the church above it.
+    const prev = entries[entries.length - 1];
+    if (prev && prev.day === day && CLERGY_RE.test(t)) prev.note = prev.note ? `${prev.note}\n${t}` : t;
+    else entries.push({ day, ...splitClergy(t) });
   }
   return { entries, overflow, numbered };
 }

@@ -246,7 +246,8 @@ await step('Diocese: paste a numbered month; today shows day 2', async () => {
   await sheet.waitFor({ state: 'detached' });
   await goToday();
   assert.equal(await page.locator('.group[data-list=diocese] .group-label').innerText(), 'DAY 2');
-  assert.deepEqual(await texts('.group[data-list=diocese] .item-text'), ['St. Barnabas’s, Town 2 — The Rev. Rector 2']);
+  assert.deepEqual(await texts('.group[data-list=diocese] .item-text'), ['St. Barnabas’s, Town 2']);
+  assert.deepEqual(await texts('.group[data-list=diocese] .item-note'), ['The Rev. Rector 2']); // clergy, editable
 });
 
 await step('Diocese: on November 30 the 31st is included', async () => {
