@@ -83,7 +83,7 @@ GitHub Pages is the simplest:
    requests are never stored in the repository. They live on your phone.
 2. Go to **Settings → Pages**. Under **Build and deployment**, choose **Deploy from a
    branch**, then pick `main` and `/ (root)`, and save.
-3. After a minute or two the app is at **https://theodramatist.github.io/Prayer-Tracker-/**.
+3. After a minute or two the app is at **https://theodramatist.github.io/Prayer-Tracker/**.
 
 Then install it:
 
