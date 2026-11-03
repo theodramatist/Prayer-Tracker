@@ -1,9 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { Store, STORAGE_KEY, migrate, defaultState } from '../../js/store.js';
-import { itemsDue } from '../../js/schedule.js';
-import { endDateFor } from '../../js/schedule.js';
+import { Store, STORAGE_KEY, migrate, defaultState, stampAsNewest } from '../../js/store.js';
+import { itemsDue, endDateFor, carriedOver, builtinEntries, cycleSource } from '../../js/schedule.js';
 
 function memoryStorage(initial = {}) {
   const data = { ...initial };
@@ -19,7 +18,7 @@ test('first run creates the four cycles and the daily lists', () => {
   const store = new Store(memoryStorage());
   const types = store.state.lists.map((l) => [l.id, l.type]);
   assert.deepEqual(types, [
-    ['anglican', 'dated'], ['diocese', 'monthly'], ['trinity', 'weekly'],
+    ['anglican', 'cycle'], ['diocese', 'monthly'], ['trinity', 'weekly'],
     ['requests', 'daily'], ['family', 'daily'], ['clergy', 'daily'],
   ]);
   assert.equal(store.list('trinity').sort, 'last');
@@ -69,7 +68,8 @@ test('day numbers are validated for the list type', () => {
   assert.equal(w.day, 0);
   const [m] = store.addItems('diocese', [{ text: 'St Paul', day: 31 }]);
   assert.equal(m.day, 31);
-  assert.deepEqual(store.addItems('anglican', [{ text: 'no date' }]), []);
+  const dated = store.addList({ name: 'Anniversaries', type: 'dated' });
+  assert.deepEqual(store.addItems(dated.id, [{ text: 'no date' }]), []);
 });
 
 test('update, move, delete and undo', () => {
@@ -108,10 +108,14 @@ test('check-offs are per date and old ones are pruned', () => {
   assert.ok(store.isChecked('2026-11-02', item.id));
   assert.ok(!store.isChecked('2026-11-03', item.id));
   store.setChecked('2026-11-02', item.id, false);
-  assert.deepEqual(store.state.checks, {});
+  assert.ok(!store.isChecked('2026-11-02', item.id));
+  assert.ok(store.state.checks['2026-11-02'][item.id] < 0); // un-checking is remembered, for sync
   store.setChecked('2020-01-01', item.id, true);
   store.pruneChecks('2026-11-02');
-  assert.deepEqual(store.state.checks, {});
+  assert.equal(store.state.checks['2020-01-01'], undefined);
+  // Version 1 stored a check as 1; it still counts.
+  store.state.checks['2026-11-03'] = { [item.id]: 1 };
+  assert.ok(store.isChecked('2026-11-03', item.id));
 });
 
 test('distribute a weekly list alphabetically, keeping shared last names together', () => {
@@ -185,4 +189,149 @@ test('durations', () => {
   assert.equal(endDateFor('3m', '2026-11-02'), '2027-02-01');
   assert.equal(endDateFor('until', '2026-11-02', '2026-12-25'), '2026-12-25');
   assert.equal(endDateFor('until', '2026-11-02', '2026-10-01'), null);
+});
+
+// ---------- schema 2: timestamps, tombstones, cycles, carry-forward ----------
+
+function clockAt(iso) {
+  let t = Date.parse(iso);
+  return { now: () => t, advance: (ms) => { t += ms; } };
+}
+
+test('version 1 data is upgraded: the empty Anglican list becomes the built-in cycle', () => {
+  const v1 = {
+    lists: [
+      { id: 'anglican', name: 'Anglican Cycle of Prayer', type: 'dated', sort: 'added', kind: 'acp', items: [] },
+      { id: 'family', name: 'Family', type: 'daily', sort: 'added', items: [{ id: 'a', text: 'Mom', created: 5 }] },
+    ],
+    checks: { '2026-11-02': { a: 1 } },
+    settings: { seasonalColor: false },
+  };
+  const m = migrate(v1, 1000, '2026-11-03');
+  assert.equal(m.schema, 2);
+  assert.equal(m.lists[0].type, 'cycle');
+  assert.equal(m.lists[0].source, 'acp');
+  assert.equal(m.lists[1].items[0].updated, 5);
+  assert.equal(m.lists[1].since, '2026-11-03');
+  assert.deepEqual(m.tombstones, {});
+  assert.equal(m.settings.seasonalColor, false);
+  assert.equal(m.settings.showPrayers, true);
+});
+
+test('changes are stamped and deletions leave tombstones', () => {
+  const c = clockAt('2026-11-03T12:00:00Z');
+  const store = new Store(memoryStorage(), { clock: c.now });
+  const [mom] = store.addItems('family', [{ text: 'Mom' }]);
+  assert.equal(mom.updated, c.now());
+  assert.equal(mom.since, '2026-11-03');
+  c.advance(1000);
+  store.updateItem(mom.id, { note: 'knee' });
+  assert.equal(store.findItem(mom.id).item.updated, c.now());
+  c.advance(1000);
+  const removed = store.deleteItem(mom.id);
+  assert.equal(store.state.tombstones[mom.id], c.now());
+  c.advance(1000);
+  store.restoreItem(removed);
+  assert.equal(store.state.tombstones[mom.id], undefined);
+  assert.equal(store.findItem(mom.id).item.updated, c.now());
+  c.advance(1000);
+  store.updateList('family', { name: 'My family' });
+  assert.equal(store.list('family').updated, c.now());
+  c.advance(1000);
+  store.moveList('family', -1);
+  assert.equal(store.state.orderUpdated, c.now());
+});
+
+test('undo (restore) wins over the changes it undoes, even on other devices', () => {
+  const c = clockAt('2026-11-03T12:00:00Z');
+  const store = new Store(memoryStorage(), { clock: c.now });
+  const [a] = store.addItems('diocese', [{ text: 'A', day: 1 }]);
+  store.setChecked('2026-11-01', a.id, true);
+  const snap = store.snapshot();
+  c.advance(1000);
+  const [b] = store.replaceItems('diocese', [{ text: 'B', day: 2 }]);
+  store.setChecked('2026-11-02', b.id, true);
+  store.setChecked('2026-11-01', a.id, false);
+  c.advance(1000);
+  store.restore(snap);
+  const t = c.now();
+  assert.deepEqual(store.list('diocese').items.map((i) => [i.text, i.updated]), [['A', t]]);
+  assert.equal(store.state.tombstones[b.id], t);
+  assert.equal(store.state.checks['2026-11-01'][a.id], t);
+  assert.equal(store.state.checks['2026-11-02'][b.id], -t);
+  assert.equal(store.state.tombstones[a.id], undefined);
+});
+
+test('stampAsNewest leaves untouched check state alone', () => {
+  const target = { lists: [], checks: { d: { x: 5 } }, settings: {}, tombstones: {} };
+  const current = { lists: [], checks: { d: { y: -3 } } };
+  stampAsNewest(target, current, 9);
+  assert.deepEqual(target.checks, { d: { x: 9 } });
+});
+
+test('a cycle of your own: one entry a day from its start, starting over at the end', () => {
+  const store = new Store(memoryStorage());
+  const list = store.addList({ name: 'Psalms', type: 'cycle' });
+  store.replaceCycle(list.id, { start: '2026-11-01', entries: [{ text: 'Psalm 1', seq: 0 }, { text: 'Psalm 2', seq: 1 }, { text: 'Psalm 3', seq: 2 }] });
+  const due = (k) => itemsDue(store.list(list.id), k).map((i) => i.text);
+  assert.deepEqual(due('2026-11-01'), ['Psalm 1']);
+  assert.deepEqual(due('2026-11-03'), ['Psalm 3']);
+  assert.deepEqual(due('2026-11-04'), ['Psalm 1']); // starts over
+  assert.deepEqual(due('2026-10-31'), ['Psalm 3']);
+  assert.equal(cycleSource(store.list(list.id)).length, 3);
+});
+
+test('built-in cycle entries can be edited, hidden, and reset', () => {
+  const bundle = { id: 'acp', start: '2023-09-01', entries: [{ text: 'Aba', note: 'Bishop A' }, [{ text: 'Abu' }, { text: 'Accra' }]] };
+  const list = { id: 'anglican', type: 'cycle', source: 'acp', items: [], overrides: {} };
+  assert.deepEqual(builtinEntries(list, bundle, 0), [{ id: 'acp:0', seq: 0, text: 'Aba', note: 'Bishop A', builtin: true, edited: false }]);
+  assert.deepEqual(builtinEntries(list, bundle, 1).map((e) => e.id), ['acp:1.0', 'acp:1.1']);
+  list.overrides['acp:0'] = { text: 'Aba and Ikwuano (merged)', note: null, updated: 1 };
+  assert.deepEqual(builtinEntries(list, bundle, 0)[0], { id: 'acp:0', seq: 0, text: 'Aba and Ikwuano (merged)', note: null, builtin: true, edited: true });
+  list.overrides['acp:1.1'] = { hidden: true, updated: 2 };
+  assert.deepEqual(builtinEntries(list, bundle, 1).map((e) => e.text), ['Abu']);
+  list.overrides['acp:0'] = { reset: true, updated: 3 };
+  assert.equal(builtinEntries(list, bundle, 0)[0].text, 'Aba');
+});
+
+test('carry forward: unchecked weekly and monthly entries stay until checked or due again', () => {
+  const c = clockAt('2026-11-01T12:00:00Z'); // Sunday
+  const store = new Store(memoryStorage(), { clock: c.now });
+  const [amy, bob, cy] = store.addItems('trinity', [{ text: 'Amy Adams', day: 1 }, { text: 'Bob Brown', day: 2 }, { text: 'Cy Cole', day: 3 }]);
+  const [paul] = store.addItems('diocese', [{ text: 'St Paul', day: 2 }]);
+  store.addItems('family', [{ text: 'Mom' }]);
+  store.state.lists.find((l) => l.id === 'trinity').since = '2026-11-01';
+  store.state.lists.find((l) => l.id === 'diocese').since = '2026-11-01';
+  store.setChecked('2026-11-03', bob.id, true);
+  const checked = (d, id) => store.isChecked(d, id);
+  const carried = (today) => [...carriedOver(store.state, today, checked).entries()]
+    .map(([list, rows]) => [list, rows.map((r) => `${r.item.text}@${r.date}`)]);
+
+  assert.deepEqual(carried('2026-11-05'), [
+    ['diocese', ['St Paul@2026-11-02']],
+    ['trinity', ['Amy Adams@2026-11-02', 'Cy Cole@2026-11-04']],
+  ]);
+  // A week on, Amy is due again: last Monday's miss is superseded. Bob was prayed for. Cy is still owed.
+  const later = carried('2026-11-09');
+  assert.deepEqual(later.find(([l]) => l === 'trinity')[1], ['Cy Cole@2026-11-04']);
+  // Checking a carried entry off marks its own day.
+  store.setChecked('2026-11-04', cy.id, true);
+  assert.equal(carried('2026-11-09').find(([l]) => l === 'trinity'), undefined);
+  // Nothing from before an entry was on the list (Zed added Nov 5, his Monday was Nov 2).
+  c.advance(4 * 864e5);
+  const [zed] = store.addItems('trinity', [{ text: 'Zed Zane', day: 1 }]);
+  assert.equal(zed.since, '2026-11-05');
+  assert.ok(!carried('2026-11-06').flatMap(([, r]) => r).some((x) => x.startsWith('Zed')));
+  assert.equal(paul.since, '2026-11-01');
+});
+
+test('carried entries: older days first, and each day keeps the list’s own order', () => {
+  const state = {
+    settings: {},
+    lists: [{ id: 't', type: 'weekly', sort: 'last', since: '2026-11-01', items: [
+      { id: 'b', text: 'Bob Baker', day: 1 }, { id: 'a', text: 'Amy Adams', day: 1 }, { id: 'c', text: 'Cy Cole', day: 2 },
+    ] }],
+  };
+  const rows = carriedOver(state, '2026-11-04', () => false).get('t').map((r) => `${r.item.text}@${r.date}`);
+  assert.deepEqual(rows, ['Amy Adams@2026-11-02', 'Bob Baker@2026-11-02', 'Cy Cole@2026-11-03']);
 });

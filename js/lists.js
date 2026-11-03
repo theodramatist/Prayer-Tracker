@@ -2,8 +2,8 @@
 // pasted in, edited and (for weekly lists) spread over the week.
 
 import { h, icon, toast, plural } from './ui.js';
-import { LIST_TYPES, SORTS, sortItems, partitionByStatus, endLabel, datedRange } from './schedule.js';
-import { WEEKDAYS, MONTHS, formatMedium, formatWithYear, formatShort, parseKey } from './dates.js';
+import { LIST_TYPES, SORTS, sortItems, partitionByStatus, endLabel, datedRange, cycleSource, itemsDue, builtinEntries } from './schedule.js';
+import { WEEKDAYS, MONTHS, addDays, formatMedium, formatWithYear, formatShort, parseKey } from './dates.js';
 import { openAddSheet, openItemSheet, openImportSheet, openListSheet, openDistributeSheet, ACP_URL } from './sheets.js';
 
 function summary(list, today) {
@@ -27,6 +27,11 @@ function summary(list, today) {
     case 'dated': {
       const r = datedRange(list);
       text = r ? `By date · ${plural(n, 'date')} to ${formatWithYear(r.last)}` : 'By date · nothing added yet';
+      break;
+    }
+    case 'cycle': {
+      const src = cycleSource(list);
+      text = src ? `Cycle · ${plural(src.length, 'day')}${src.builtin ? ' · built in' : ''}` : 'Cycle · nothing added yet';
       break;
     }
     default:
@@ -67,10 +72,10 @@ export function renderLists(app) {
   ];
 }
 
-function row(app, item, { key, today } = {}) {
-  const badge = endLabel(item, today);
+function row(app, item, { key, today, list = null, badge: extra = null } = {}) {
+  const badge = extra || endLabel(item, today);
   return h('li', { 'data-q': `${item.text} ${item.note || ''}`.toLowerCase() },
-    h('button', { class: 'row', type: 'button', onclick: () => openItemSheet(app, item.id) },
+    h('button', { class: 'row', type: 'button', onclick: () => openItemSheet(app, item.id, { list, entry: item.builtin ? item : null }) },
       key && h('span', { class: 'row-key' }, key),
       h('span', { class: 'row-main' },
         h('span', { class: 'row-text' }, item.text),
@@ -135,11 +140,13 @@ export function renderListDetail(app, id) {
       className: 'compact',
     }));
     if (!list.items.length) body.unshift(emptyState(app, list));
+  } else if (list.type === 'cycle') {
+    body = cycleBody(app, list);
   } else {
     body = datedBody(app, list, sorted);
   }
 
-  const search = list.items.length > 12 && h('div', { class: 'search-wrap' },
+  const search = list.items.length > 12 && list.type !== 'cycle' && h('div', { class: 'search-wrap' },
     icon('search'),
     h('input', {
       type: 'search',
@@ -149,7 +156,10 @@ export function renderListDetail(app, id) {
       oninput: (e) => filterRows(e.target.value),
     }));
 
-  const sub = [LIST_TYPES[list.type].label, `ordered by ${SORTS[list.sort].toLowerCase()}`];
+  const src = cycleSource(list);
+  const sub = list.type === 'cycle'
+    ? [LIST_TYPES.cycle.label, src ? `${plural(src.length, 'day')} from ${formatWithYear(src.start)}, then it starts over` : 'nothing added yet']
+    : [LIST_TYPES[list.type].label, `ordered by ${SORTS[list.sort].toLowerCase()}`];
   if (list.hidden) sub.push('hidden from Today');
 
   return [
@@ -160,8 +170,9 @@ export function renderListDetail(app, id) {
       h('h1', null, list.name),
       h('p', { class: 'list-sub' }, sub.join(' · '))),
     h('div', { class: 'toolbar' },
-      list.type !== 'dated' && h('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: () => openAddSheet(app, { listId: list.id }) }, icon('plus'), 'Add'),
-      h('button', { class: 'btn btn-sm', type: 'button', onclick: () => openImportSheet(app, list.id) }, icon('paste'), list.type === 'dated' ? 'Add the cycle' : 'Paste a list'),
+      list.type !== 'dated' && list.type !== 'cycle' && h('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: () => openAddSheet(app, { listId: list.id }) }, icon('plus'), 'Add'),
+      h('button', { class: 'btn btn-sm', type: 'button', onclick: () => openImportSheet(app, list.id) }, icon('paste'),
+        list.type === 'cycle' ? (src?.builtin ? 'Load a newer cycle' : 'Add the cycle') : list.type === 'dated' ? 'Add dates' : 'Paste a list'),
       list.type === 'weekly' && list.items.length > 1 && h('button', { class: 'btn btn-sm', type: 'button', onclick: () => openDistributeSheet(app, list.id) }, icon('spread'), 'Spread over the week'),
       list.kind === 'acp' && h('a', { class: 'btn btn-sm', href: ACP_URL, target: '_blank', rel: 'noopener' }, icon('link'), 'anglicancommunion.org'),
       list.hidden && h('button', { class: 'btn btn-sm', type: 'button', onclick: () => store.updateList(list.id, { hidden: false }) }, 'Show on Today')),
@@ -196,12 +207,47 @@ function datedBody(app, list, sorted) {
   return out;
 }
 
+/** A cycle's coming days, and any entries you have changed. */
+function cycleBody(app, list) {
+  const src = cycleSource(list);
+  if (!src) return [emptyState(app, list)];
+  const days = app.cycleDays || 30;
+  const rows = [];
+  for (let k = 0; k < days; k++) {
+    const date = addDays(app.today, k);
+    for (const e of itemsDue(list, date)) {
+      rows.push(row(app, e, { today: app.today, list, key: k === 0 ? 'Today' : formatMedium(date), badge: e.edited ? 'Edited' : null }));
+    }
+  }
+  const out = [section('Coming days', rows, { count: false, className: 'dated' })];
+  if (days < src.length) {
+    out.push(h('button', {
+      class: 'btn btn-quiet btn-sm',
+      type: 'button',
+      onclick: () => { app.cycleDays = Math.min(src.length, days + 60); app.render(); },
+    }, 'Show more days'));
+  }
+  const changed = Object.entries(list.overrides || {}).filter(([, o]) => !o.reset);
+  if (src.builtin && changed.length) {
+    const index = (id) => Number(id.split(':')[1]);
+    const items = changed.sort((a, b) => index(a[0]) - index(b[0])).map(([id, o]) => {
+      const e = builtinEntries({ ...list, overrides: {} }, src.bundle, index(id)).find((x) => x.id === id);
+      if (!e) return null;
+      const shown = o.hidden ? { ...e, note: 'Hidden' } : { ...e, text: o.text ?? e.text, note: o.note ?? e.note, edited: true };
+      return row(app, shown, { today: app.today, list, key: `Day ${index(id) + 1}`, badge: o.hidden ? 'Hidden' : 'Edited' });
+    }).filter(Boolean);
+    out.push(section('Your changes', items, { className: 'dated' }));
+  }
+  return out;
+}
+
 function emptyState(app, list) {
   const copy = {
     daily: 'No one here yet.',
     weekly: 'No names yet. Add them one at a time, or paste a whole list. Put a day name (Sunday, Monday…) on its own line above that day’s names, or paste them all and spread them over the week.',
     monthly: 'Nothing yet. Paste your diocese’s cycle: one church per line, starting with its day number.',
-    dated: 'Nothing yet. Download the Anglican Cycle of Prayer PDF and choose it under Add the cycle, or copy its text and paste it in.',
+    dated: 'Nothing yet. Paste in entries that each start with their date.',
+    cycle: 'Nothing yet. Choose Add the cycle and pick its PDF, or paste its text: each day’s entry starting with its date.',
   }[list.type];
   return h('div', { class: 'empty-card' }, h('p', null, copy));
 }

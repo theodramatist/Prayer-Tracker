@@ -69,6 +69,71 @@ export function restoreBackup(app) {
   input.click();
 }
 
+function ago(ms) {
+  const mins = Math.round((Date.now() - ms) / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins} minute${mins === 1 ? '' : 's'} ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+  return formatWithYear(todayKey(new Date(ms)));
+}
+
+function syncCard(app) {
+  const { sync } = app;
+  if (!sync) return null;
+  if (sync.enabled) {
+    const st = sync.status;
+    const line = st.state === 'syncing' ? 'Syncing…'
+      : st.state === 'error' ? st.message
+        : st.at ? `Last synced ${ago(st.at)}.` : 'Not synced yet.';
+    return card('Sync across devices',
+      h('p', null, 'Syncing with ', h('strong', null, sync.repo), ' on GitHub.'),
+      h('p', { class: `hint sync-status ${st.state === 'error' ? 'is-error' : ''}`, 'aria-live': 'polite' }, line),
+      h('div', { class: 'button-row' },
+        h('button', { class: 'btn btn-primary', type: 'button', disabled: st.state === 'syncing', onclick: () => sync.sync() }, 'Sync now'),
+        h('button', {
+          class: 'btn',
+          type: 'button',
+          onclick: async () => {
+            const ok = await confirmSheet({
+              title: 'Turn off sync on this device?',
+              message: 'Your lists stay on this device and in the repository; they just stop being kept in step here.',
+              confirm: 'Turn off',
+            });
+            if (ok) { sync.disconnect(); app.render(); }
+          },
+        }, 'Turn off')));
+  }
+  const repo = h('input', { class: 'input', placeholder: 'yourname/prayer-data', autocapitalize: 'none', autocomplete: 'off', spellcheck: 'false', 'aria-label': 'Repository' });
+  const token = h('input', { class: 'input', type: 'password', placeholder: 'github_pat_…', autocomplete: 'off', 'aria-label': 'Access token' });
+  const status = h('p', { class: 'hint sync-status', 'aria-live': 'polite' });
+  const connect = h('button', { class: 'btn btn-primary', type: 'submit' }, 'Connect');
+  const form = h('form', { class: 'sync-form', novalidate: true }, field('Repository', repo), field('Access token', token), status, connect);
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    connect.disabled = true;
+    status.classList.remove('is-error');
+    status.textContent = 'Connecting…';
+    try {
+      await sync.connect(repo.value, token.value);
+      toast('Sync is on');
+      app.render();
+    } catch (err) {
+      status.textContent = err.message;
+      status.classList.add('is-error');
+      connect.disabled = false;
+    }
+  });
+  return card('Sync across devices',
+    h('p', null, 'Keep the same lists on your phone, iPad and computer. They’re saved as one file in a private GitHub repository of your own, and each device keeps working offline.'),
+    h('ol', { class: 'steps' },
+      h('li', null, 'On GitHub, create a new ', h('strong', null, 'private'), ' repository, for example ', h('code', null, 'prayer-data'), '.'),
+      h('li', null, 'Make a ', h('a', { href: 'https://github.com/settings/personal-access-tokens/new', target: '_blank', rel: 'noopener' }, 'fine-grained access token'),
+        '. Under Repository access choose “Only select repositories” and pick that repository; under Permissions set ', h('strong', null, 'Contents'), ' to “Read and write”.'),
+      h('li', null, 'Enter both below, and do the same on each device. The token stays on the device; it isn’t synced or put in backups.')),
+    form);
+}
+
 export function renderSettings(app) {
   const { store } = app;
   const s = store.state.settings;
@@ -118,6 +183,16 @@ export function renderSettings(app) {
         onChange: (v) => store.setSetting('theme', v),
       }))),
 
+    card('Prayers',
+      toggle({
+        label: 'Show each list’s prayer',
+        hint: 'A prayer from the Prayer Book opens each list on Today and in pray-through. To change one, open the list and tap ⋯.',
+        checked: s.showPrayers !== false,
+        onChange: (v) => store.setSetting('showPrayers', v),
+      })),
+
+    syncCard(app),
+
     card('Monthly cycles',
       toggle({
         label: 'Catch up in shorter months',
@@ -127,7 +202,9 @@ export function renderSettings(app) {
       })),
 
     card('Backup',
-      h('p', null, 'Your lists are kept only on this device. Save a backup now and then, and before you change phones.'),
+      h('p', null, app.sync?.enabled
+        ? 'Your lists are synced, but a backup file is still a good idea now and then.'
+        : 'Your lists are kept only on this device. Save a backup now and then, and before you change phones.'),
       h('p', { class: 'hint' }, meta.lastBackup ? `Last backup: ${formatWithYear(todayKey(new Date(meta.lastBackup)))}` : 'No backup saved yet.'),
       h('div', { class: 'button-row' },
         h('button', { class: 'btn btn-primary', type: 'button', onclick: () => saveBackup(app) }, icon('download'), 'Save a backup'),
@@ -143,11 +220,14 @@ export function renderSettings(app) {
         onclick: async () => {
           const ok = await confirmSheet({
             title: 'Erase everything?',
-            message: 'All lists, names and check-offs on this device will be deleted. Save a backup first if you might want them back.',
+            message: app.sync?.enabled
+              ? 'All lists, names and check-offs on this device will be deleted, and sync turned off here. The synced copy on GitHub is not touched.'
+              : 'All lists, names and check-offs on this device will be deleted. Save a backup first if you might want them back.',
             confirm: 'Erase',
             danger: true,
           });
           if (!ok) return;
+          app.sync?.disconnect();
           const snap = store.snapshot();
           store.eraseAll();
           toast('Erased', { action: 'Undo', onAction: () => store.restore(snap) });

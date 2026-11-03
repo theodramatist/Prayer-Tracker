@@ -12,6 +12,8 @@ test('service worker caches every app file', async () => {
   const expected = [
     'index.html', 'manifest.webmanifest',
     ...(await readdir(new URL('js/', root))).filter((f) => f.endsWith('.js')).map((f) => `js/${f}`),
+    ...(await readdir(new URL('js/data/', root))).filter((f) => f.endsWith('.js')).map((f) => `js/data/${f}`),
+    ...(await readdir(new URL('fonts/', root))).filter((f) => f.endsWith('.woff2')).map((f) => `fonts/${f}`),
     ...(await readdir(new URL('css/', root))).map((f) => `css/${f}`),
     ...(await readdir(new URL('icons/', root))).filter((f) => f !== 'icon.svg').map((f) => `icons/${f}`),
   ];

@@ -23,7 +23,7 @@ const context = await browser.newContext({
   timezoneId: 'America/New_York',
   acceptDownloads: true,
 });
-const page = await context.newPage();
+let page = await context.newPage();
 await page.clock.setFixedTime(new Date('2026-11-02T09:00:00-05:00')); // Monday
 
 const problems = [];
@@ -87,18 +87,20 @@ async function pasteInto(id, text, { choose } = {}) {
   return sheet;
 }
 
+const heading = () => page.locator('.day-head h1').getAttribute('aria-label');
+
 async function goToday() {
   await page.click('.tabbar a[href="#/"]');
   await page.locator('.day-head h1').waitFor();
 }
 
-console.log('Prayer Tracker end-to-end');
+console.log('Prayer Tracker end-to-end\n Part 1: lists, cycles, check-offs, backup, offline');
 
 await step('first run shows setup cards for the three cycles', async () => {
   await page.goto(BASE);
   await page.locator('.day-head h1').waitFor();
-  assert.equal(await page.locator('.day-head h1').innerText(), 'Monday, November 2');
-  assert.equal(await page.locator('.season').innerText(), 'Season after Pentecost');
+  assert.equal(await heading(), 'Monday, November 2');
+  assert.equal(await page.locator('.feast').innerText(), 'Season after Pentecost');
   assert.deepEqual(await texts('.setup-card h2'), ['Anglican Cycle of Prayer', 'Diocesan Cycle', 'Trinity']);
   await shot('01-first-run');
 });
@@ -156,16 +158,16 @@ await step('check-offs and items survive a reload', async () => {
 
 await step('the next day starts fresh; a one-week request ends on time', async () => {
   await page.click('button[aria-label="Next day"]');
-  assert.equal(await page.locator('.day-head h1').innerText(), 'Tuesday, November 3');
+  assert.equal(await heading(), 'Tuesday, November 3');
   assert.equal(await page.locator('.day-rel').innerText(), 'TOMORROW');
   assert.deepEqual(await texts('.group[data-list=family] .item-text'), ['Mom', 'Dad', 'Aunt Sue']);
   for (let i = 0; i < 5; i++) await page.click('button[aria-label="Next day"]');
-  assert.equal(await page.locator('.day-head h1').innerText(), 'Sunday, November 8');
+  assert.equal(await heading(), 'Sunday, November 8');
   assert.deepEqual(await texts('.group[data-list=requests] .badge'), ['Last day']);
   await page.click('button[aria-label="Next day"]');
   assert.equal(await page.locator('.group[data-list=requests]').count(), 0);
   await page.click('.back-today');
-  assert.equal(await page.locator('.day-head h1').innerText(), 'Monday, November 2');
+  assert.equal(await heading(), 'Monday, November 2');
 });
 
 const TRINITY = `Sunday
@@ -270,7 +272,8 @@ The Diocese of Gamma – (Example)`;
 
 await step('Anglican Cycle: paste dated text; today shows its diocese and bishop', async () => {
   const sheet = await pasteInto('anglican', ACP);
-  assert.equal(await sheet.locator('.preview-summary').innerText(), '4 dates from Nov 1, 2026 to Nov 4, 2026');
+  assert.equal(await sheet.locator('.preview-summary').innerText(), '4 days, Nov 1, 2026 to Nov 4, 2026, then it starts over');
+  assert.match(await sheet.locator('button[type=submit]').innerText(), /^Use these 4 days/);
   await shot('06-import-acp');
   await sheet.locator('button[type=submit]').click();
   await sheet.waitFor({ state: 'detached' });
@@ -281,9 +284,10 @@ await step('Anglican Cycle: paste dated text; today shows its diocese and bishop
   await page.locator('.view').screenshot({ path: `${OUT}07-today-full-page.png` });
 });
 
-await step('Anglican Cycle: after the last date, a notice asks for the new cycle', async () => {
-  await page.evaluate(() => window.prayerTracker.setDate('2026-11-10'));
-  assert.match(await page.locator('.notice-card').innerText(), /ends on Nov 4, 2026/);
+await step('Anglican Cycle: after its last day the cycle starts over', async () => {
+  await page.evaluate(() => window.prayerTracker.setDate('2026-11-05'));
+  assert.deepEqual(await texts('.group[data-list=anglican] .item-text'), ['Pray for the Church of the Province of Example']);
+  assert.equal(await page.locator('.notice-card').count(), 0);
   await page.click('.back-today');
 });
 
@@ -305,9 +309,9 @@ await step('Anglican Cycle: read straight from a PDF', async () => {
   const sheet = page.locator('.sheet-import');
   await sheet.waitFor();
   await sheet.locator('input[type=file]').setInputFiles(pdfPath);
-  await eventually(async () => assert.equal(await sheet.locator('.preview-summary').innerText(), '4 dates from Nov 2, 2026 to Nov 5, 2026'), 15000);
-  // Merge: those four dates are replaced, Nov 1 is kept.
-  assert.match(await sheet.locator('button[type=submit]').innerText(), /^Add 4/);
+  await eventually(async () => assert.equal(await sheet.locator('.preview-summary').innerText(), '4 days, Nov 2, 2026 to Nov 5, 2026, then it starts over'), 15000);
+  // A cycle is replaced as a whole.
+  assert.match(await sheet.locator('button[type=submit]').innerText(), /^Use these 4 days/);
   await sheet.locator('button[type=submit]').click();
   await sheet.waitFor({ state: 'detached' });
   await goToday();
@@ -360,8 +364,13 @@ await step('?add opens the add sheet; shared text arrives prefilled', async () =
 await step('midnight rollover moves Today forward', async () => {
   await page.clock.setFixedTime(new Date('2026-11-03T00:00:30-05:00'));
   await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
-  await eventually(async () => assert.equal(await page.locator('.day-head h1').innerText(), 'Tuesday, November 3'));
+  await eventually(async () => assert.equal(await heading(), 'Tuesday, November 3'));
   assert.equal(await page.locator('.day-rel').innerText(), 'TODAY');
+  // Monday's unprayed cycle entries are carried into Tuesday.
+  assert.deepEqual(await texts('.group[data-list=trinity] .items-carried .item-text'), ['Mary Adams', 'John & Sue Baker']);
+  assert.deepEqual(await texts('.group[data-list=anglican] .items-carried .item-text'), ['The Diocese of Delta – (Example)']);
+  assert.equal(await page.locator('.group[data-list=family] .items-carried').count(), 0); // daily lists just repeat
+  await shot('08b-carried');
   await page.clock.setFixedTime(new Date('2026-11-02T09:00:00-05:00'));
   await page.reload();
   await page.locator('.day-head h1').waitFor();
@@ -422,7 +431,7 @@ await step('works offline once loaded', async () => {
   await context.setOffline(true);
   await page.reload();
   await page.locator('.day-head h1').waitFor();
-  assert.equal(await page.locator('.day-head h1').innerText(), 'Monday, November 2');
+  assert.equal(await heading(), 'Monday, November 2');
   await context.setOffline(false);
 });
 
@@ -441,6 +450,219 @@ await step('dark mode', async () => {
 await step('no errors in the console', async () => {
   // The offline step makes Chromium log one failed network fetch for the SW update check.
   const real = problems.filter((p) => !/ERR_INTERNET_DISCONNECTED|Failed to fetch|net::ERR/.test(p));
+  assert.deepEqual(real, []);
+});
+
+// ---------- Part 2: the built-in cycle, the calendar, prayers, carry-forward, pray-through, sync ----------
+
+console.log(' Part 2: built-in cycle, feasts, prayers, carry-forward, pray-through, sync');
+const NAMES = ['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'Zeta', 'Eta', 'Theta', 'Iota', 'Kappa'];
+// A stand-in for js/data/acp.js (the real one is built from the Anglican Communion's PDF).
+const FAKE_ACP = `export default { id: 'acptest', title: 'Test cycle', source: 'test', start: '2026-10-30', entries: [
+${NAMES.map((n) => `  { text: 'The Diocese of ${n} (Example)', note: 'The Rt Revd ${n} Bishop' },`).join('\n')}
+] };`;
+
+const gh = { file: null, version: 0 };
+const ghDoc = () => JSON.parse(Buffer.from(gh.file, 'base64').toString('utf8'));
+const context2 = await browser.newContext({
+  viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true,
+  locale: 'en-US', timezoneId: 'America/New_York', serviceWorkers: 'block',
+});
+await context2.route('**/js/data/acp.js', (route) => route.fulfill({ contentType: 'text/javascript', body: FAKE_ACP }));
+await context2.route('https://api.github.com/**', async (route) => {
+  const req = route.request();
+  const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'authorization, content-type, accept, x-github-api-version', 'access-control-allow-methods': 'GET, PUT, OPTIONS' };
+  const json = (status, body) => route.fulfill({ status, headers: cors, contentType: 'application/json', body: JSON.stringify(body) });
+  if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+  if (req.headers().authorization !== 'Bearer good-token') return json(401, { message: 'Bad credentials' });
+  const path = new URL(req.url()).pathname;
+  if (path === '/repos/me/prayer-data') return json(200, { private: true, full_name: 'me/prayer-data' });
+  if (path !== '/repos/me/prayer-data/contents/prayer-tracker.json') return json(404, { message: 'Not Found' });
+  if (req.method() === 'GET') return gh.file ? json(200, { sha: `s${gh.version}`, encoding: 'base64', content: gh.file }) : json(404, { message: 'Not Found' });
+  const body = JSON.parse(req.postData());
+  if (gh.file && body.sha !== `s${gh.version}`) return json(409, { message: 'does not match' });
+  gh.version += 1;
+  gh.file = body.content;
+  return json(200, { content: { sha: `s${gh.version}` } });
+});
+page = await context2.newPage();
+await page.clock.setFixedTime(new Date('2026-11-02T09:00:00-05:00'));
+const problems2 = [];
+page.on('pageerror', (e) => problems2.push(`pageerror: ${e.message}`));
+page.on('console', (m) => { if (m.type() === 'error') problems2.push(`console: ${m.text()}`); });
+
+await step('the built-in Anglican Cycle shows today’s diocese, with nothing to set up', async () => {
+  await page.goto(BASE);
+  await page.locator('.day-head h1').waitFor();
+  assert.deepEqual(await texts('.group[data-list=anglican] .item-text'), ['The Diocese of Delta (Example)']);
+  assert.deepEqual(await texts('.group[data-list=anglican] .item-note'), ['The Rt Revd Delta Bishop']);
+  assert.deepEqual(await texts('.setup-card h2'), ['Diocesan Cycle', 'Trinity']);
+  // Ten days from Oct 30, then it starts over.
+  await page.evaluate(() => window.prayerTracker.setDate('2026-11-09'));
+  assert.deepEqual(await texts('.group[data-list=anglican] .item-text'), ['The Diocese of Alpha (Example)']);
+  await page.evaluate(() => window.prayerTracker.setDate('2026-11-02'));
+});
+
+await step('each list opens with its prayer, folded until tapped', async () => {
+  assert.equal(await page.locator('.group[data-list=anglican] .prayer-title').innerText(), 'FOR THE CHURCH');
+  assert.equal(await page.locator('.group[data-list=anglican] .prayer-text').isVisible(), false);
+  await page.locator('.group[data-list=anglican] .prayer summary').click();
+  assert.match(await page.locator('.group[data-list=anglican] .prayer-text').innerText(), /^Gracious Father, we pray for thy holy Catholic Church/);
+  await shot('20-today-prayer-open');
+  await page.locator('.group[data-list=anglican] .prayer summary').click();
+});
+
+await step('the feast of the day and its colour', async () => {
+  await page.evaluate(() => window.prayerTracker.setDate('2026-11-30'));
+  assert.equal(await page.locator('.feast').innerText(), 'Saint Andrew the Apostle');
+  assert.equal(await page.locator('.day-head').getAttribute('data-color'), 'red');
+  await page.evaluate(() => window.prayerTracker.setDate('2026-11-29'));
+  assert.equal(await page.locator('.feast').innerText(), 'The First Sunday of Advent');
+  assert.equal(await page.locator('.day-head').getAttribute('data-color'), 'blue');
+  await shot('21-advent');
+  await page.evaluate(() => window.prayerTracker.setDate('2026-11-08'));
+  assert.equal(await page.locator('.feast').innerText(), 'The Twenty-fourth Sunday after Pentecost');
+  assert.equal(await page.locator('.feast-detail').innerText(), 'PROPER 27');
+  await page.click('.back-today');
+});
+
+await step('a built-in entry can be reworded (say, after a merger) and restored', async () => {
+  await page.locator('.group[data-list=anglican] .item-body').click();
+  const sheet = page.locator('.sheet-item');
+  await sheet.waitFor();
+  assert.equal(await sheet.locator('h2').innerText(), 'Edit entry');
+  await sheet.locator('input.input-lg').fill('The Diocese of Delta and Epsilon (Example)');
+  await sheet.locator('button[type=submit]').click();
+  await sheet.waitFor({ state: 'detached' });
+  assert.deepEqual(await texts('.group[data-list=anglican] .item-text'), ['The Diocese of Delta and Epsilon (Example)']);
+  await openList('anglican');
+  assert.match(await page.locator('.detail-section', { hasText: 'Your changes' }).innerText(), /Delta and Epsilon[\s\S]*Edited/);
+  await shot('22-cycle-list');
+  await page.locator('.detail-section', { hasText: 'Your changes' }).locator('.row').click();
+  await page.locator('.sheet-item .link-btn', { hasText: 'Restore the original wording' }).click();
+  await goToday();
+  assert.deepEqual(await texts('.group[data-list=anglican] .item-text'), ['The Diocese of Delta (Example)']);
+});
+
+await step('a list’s prayer can be changed to another, or to your own words', async () => {
+  await quickAdd('Mom', { list: 'Family' });
+  assert.equal(await page.locator('.group[data-list=family] .prayer-title').innerText(), 'FOR THOSE WE LOVE');
+  await openList('family');
+  await page.locator('button[aria-label="List settings"]').click();
+  const sheet = page.locator('.sheet-list');
+  await sheet.waitFor();
+  await sheet.locator('select').selectOption('absent');
+  assert.match(await sheet.locator('textarea').inputValue(), /^O God, whose fatherly care reacheth/);
+  await sheet.locator('.prayer-edit input').fill('For my family');
+  await sheet.locator('textarea').fill('Lord, keep those I love in your care, near and far. Amen.');
+  await shot('23-prayer-editor');
+  await sheet.locator('button[type=submit]').click();
+  await sheet.waitFor({ state: 'detached' });
+  await goToday();
+  assert.equal(await page.locator('.group[data-list=family] .prayer-title').innerText(), 'FOR MY FAMILY');
+  await page.locator('.group[data-list=family] .prayer summary').click();
+  assert.equal(await page.locator('.group[data-list=family] .prayer-text').innerText(), 'Lord, keep those I love in your care, near and far. Amen.');
+});
+
+await step('missed entries carry forward until prayed, or let go', async () => {
+  await quickAdd('Ann Able', { list: 'Trinity' }); // goes on Monday
+  await page.clock.setFixedTime(new Date('2026-11-03T09:00:00-05:00'));
+  await page.reload();
+  await page.locator('.day-head h1').waitFor();
+  assert.deepEqual(await texts('.group[data-list=anglican] .items:not(.items-carried) .item-text'), ['The Diocese of Epsilon (Example)']);
+  assert.deepEqual(await texts('.group[data-list=anglican] .items-carried .item-text'), ['The Diocese of Delta (Example)']);
+  assert.deepEqual(await texts('.group[data-list=trinity] .items-carried .item-text'), ['Ann Able']);
+  assert.deepEqual(await texts('.group[data-list=trinity] .items-carried .badge'), ['Mon, Nov 2']);
+  assert.equal(await page.locator('.group[data-list=family] .items-carried').count(), 0);
+  assert.match(await page.locator('.progress-text').innerText(), /2 from earlier days/);
+  await shot('24-carried');
+  await page.locator('.group[data-list=trinity] .items-carried .check').click();
+  await eventually(async () => assert.equal(await page.locator('.group[data-list=trinity] .items-carried').count(), 0));
+  assert.ok(await page.evaluate(() => {
+    const ann = window.prayerTracker.store.list('trinity').items[0];
+    return window.prayerTracker.store.isChecked('2026-11-02', ann.id);
+  }));
+  await page.locator('.group[data-list=anglican] .carried-head .link-btn').click();
+  await eventually(async () => assert.equal(await page.locator('.group[data-list=anglican] .items-carried').count(), 0));
+  await page.locator('.toast.show .toast-action').click();
+  await eventually(async () => assert.equal(await page.locator('.group[data-list=anglican] .items-carried .item').count(), 1));
+});
+
+await step('pray-through: each list’s prayer, then one entry at a time; Amen marks it prayed', async () => {
+  await page.locator('.btn-pray').click();
+  const pray = page.locator('dialog.pray');
+  await pray.waitFor();
+  assert.equal(await pray.locator('.pray-prayer-title').innerText(), 'For the Church');
+  await shot('25-pray-prayer');
+  await pray.locator('.btn-amen').click();
+  assert.equal(await pray.locator('.pray-name').innerText(), 'The Diocese of Epsilon (Example)');
+  assert.equal(await pray.locator('.pray-count').innerText(), '1 of 3');
+  await shot('26-pray-entry');
+  await pray.locator('.btn-amen').click();
+  assert.equal(await pray.locator('.pray-name').innerText(), 'The Diocese of Delta (Example)');
+  assert.equal(await pray.locator('.pray-from').innerText(), 'From Mon, Nov 2');
+  await pray.locator('.btn-amen').click();
+  assert.equal(await pray.locator('.pray-prayer-title').innerText(), 'For my family');
+  await pray.locator('.btn-amen').click();
+  assert.equal(await pray.locator('.pray-name').innerText(), 'Mom');
+  await pray.locator('button', { hasText: 'Back' }).click(); // back to the prayer, then forward again
+  await pray.locator('.btn-amen').click();
+  await pray.locator('.btn-amen').click();
+  assert.equal(await pray.locator('.pray-response').innerText(), 'Thanks be to God.');
+  assert.match(await pray.locator('.pray-summary').innerText(), /Everyone on today’s list/);
+  await shot('27-pray-end');
+  await pray.locator('.btn-amen').click(); // Close
+  await pray.waitFor({ state: 'detached' });
+  await eventually(async () => assert.equal(await page.locator('.complete-response').innerText(), 'Thanks be to God.'));
+});
+
+await step('sync: refuses a bad token, connects to a private repository, and picks up another device’s changes', async () => {
+  await page.click('.tabbar a[href="#/lists"]');
+  await page.click('a[href="#/settings"]');
+  const card = page.locator('.settings-card', { hasText: 'Sync across devices' });
+  await card.locator('input[aria-label="Repository"]').fill('me/prayer-data');
+  await card.locator('input[aria-label="Access token"]').fill('wrong');
+  await card.locator('button[type=submit]').click();
+  await eventually(async () => assert.match(await card.locator('.sync-status').innerText(), /token/));
+  await card.locator('input[aria-label="Access token"]').fill('good-token');
+  await card.locator('button[type=submit]').click();
+  await eventually(async () => assert.match(await page.locator('.settings-card', { hasText: 'Sync across devices' }).innerText(), /Last synced just now/));
+  await shot('28-sync-on');
+  const doc = ghDoc();
+  assert.deepEqual(doc.lists.find((l) => l.id === 'family').items.map((i) => i.text), ['Mom']);
+  assert.equal(doc.meta, undefined); // device-only settings stay on the device
+  // Another device adds Grandma.
+  const t = Date.parse('2026-11-03T10:00:00-05:00');
+  doc.lists.find((l) => l.id === 'family').items.push({ id: 'from-ipad', text: 'Grandma', created: t, updated: t, since: '2026-11-03' });
+  gh.file = Buffer.from(JSON.stringify(doc)).toString('base64');
+  gh.version += 1;
+  await page.locator('button', { hasText: 'Sync now' }).click();
+  await eventually(async () => assert.match(await page.locator('.settings-card', { hasText: 'Sync across devices' }).innerText(), /Last synced/));
+  await goToday();
+  await page.locator('.show-done button').click();
+  assert.deepEqual(await texts('.group[data-list=family] .item-text'), ['Grandma', 'Mom']);
+  // A change here goes back up.
+  await page.locator('.item', { hasText: 'Grandma' }).locator('.check').click();
+  await eventually(async () => assert.ok((ghDoc().checks['2026-11-03'] || {})['from-ipad'] > 0), 6000);
+});
+
+await step('part 2 light and dark screenshots', async () => {
+  await page.evaluate(() => window.prayerTracker.setDate('2026-11-04'));
+  await shot('29-today-new-design');
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await eventually(async () => assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'dark'));
+  await shot('30-today-dark');
+  await page.locator('.btn-pray').click();
+  await page.locator('dialog.pray').waitFor();
+  await page.locator('dialog.pray .btn-amen').click();
+  await sleep(350);
+  await shot('31-pray-dark');
+  await page.locator('dialog.pray button[aria-label="Close"]').click();
+  await page.emulateMedia({ colorScheme: 'light' });
+});
+
+await step('no errors in the console (part 2)', async () => {
+  const real = problems2.filter((p) => !/Failed to load resource: the server responded with a status of (401|404)/.test(p));
   assert.deepEqual(real, []);
 });
 

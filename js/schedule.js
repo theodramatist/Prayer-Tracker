@@ -4,16 +4,20 @@
 //   daily   – every item, every day (each item may have a start/end date)
 //   weekly  – item.day is the weekday, 0 = Sunday … 6 = Saturday
 //   monthly – item.day is the day of the month, 1 … 31
-//   dated   – item.date is one specific date (used for the Anglican Cycle of Prayer)
+//   dated   – item.date is one specific date
+//   cycle   – one entry per day from a start date, starting over at the end
+//             (the Anglican Cycle of Prayer, built in; see bundles.js)
 
-import { weekday, parseKey, daysInMonth, diffDays, addDays, addMonths, WEEKDAYS, formatShort } from './dates.js';
+import { weekday, parseKey, daysInMonth, diffDays, addDays, addMonths, todayKey, WEEKDAYS, formatShort } from './dates.js';
 import { parseName, compareNames, compareText } from './names.js';
+import { bundleFor } from './bundles.js';
 
 export const LIST_TYPES = {
   daily: { label: 'Daily', blurb: 'Everyone on the list, every day' },
   weekly: { label: 'Weekly', blurb: 'A different set of names each day of the week' },
   monthly: { label: 'Monthly', blurb: 'A different entry for each day of the month' },
-  dated: { label: 'By date', blurb: 'One entry for each calendar date, like the Anglican Cycle of Prayer' },
+  dated: { label: 'By date', blurb: 'Entries for particular dates, such as anniversaries' },
+  cycle: { label: 'Cycle', blurb: 'One entry a day, in order, starting over at the end, like the Anglican Cycle of Prayer' },
 };
 
 export const SORTS = {
@@ -76,6 +80,55 @@ export function sortItems(list, items) {
   return arr;
 }
 
+/**
+ * Where a cycle list's days come from: its own entries (each with a `seq`, the
+ * day number from `start`), or else a built-in cycle such as the Anglican Cycle.
+ */
+export function cycleSource(list) {
+  if (list.type !== 'cycle') return null;
+  if (list.items.length) {
+    let length = 0;
+    for (const i of list.items) length = Math.max(length, (i.seq ?? 0) + 1);
+    return { start: list.start || list.since, length, builtin: false };
+  }
+  const bundle = bundleFor(list);
+  return bundle ? { start: bundle.start, length: bundle.entries.length, builtin: true, bundle } : null;
+}
+
+/** Day `index` of a cycle that began on `start` (wrapping in both directions). */
+export function cycleIndex(start, length, dateKey) {
+  const n = diffDays(start, dateKey);
+  return ((n % length) + length) % length;
+}
+
+/** The built-in entries for one day of a cycle, with any of your edits applied. */
+export function builtinEntries(list, bundle, index) {
+  const day = bundle.entries[index];
+  const parts = Array.isArray(day) ? day : [day];
+  const out = [];
+  parts.forEach((base, k) => {
+    const id = parts.length > 1 ? `${bundle.id}:${index}.${k}` : `${bundle.id}:${index}`;
+    const o = list.overrides?.[id];
+    const edit = o && !o.reset ? o : null;
+    if (edit?.hidden) return;
+    out.push({
+      id,
+      seq: index,
+      text: edit?.text ?? base.text,
+      note: edit && 'note' in edit ? edit.note : base.note,
+      builtin: true,
+      edited: !!edit,
+    });
+  });
+  return out;
+}
+
+/** How many entries a list has (for a cycle: how many days it runs). */
+export function entryCount(list) {
+  if (list.type === 'cycle') return cycleSource(list)?.length || 0;
+  return list.items.length;
+}
+
 /** Items from one list that are due on dateKey, in display order. */
 export function itemsDue(list, dateKey, { foldShortMonths = true } = {}) {
   let due;
@@ -96,6 +149,13 @@ export function itemsDue(list, dateKey, { foldShortMonths = true } = {}) {
     case 'dated':
       due = list.items.filter((i) => i.date === dateKey);
       break;
+    case 'cycle': {
+      const src = cycleSource(list);
+      if (!src) { due = []; break; }
+      const index = cycleIndex(src.start, src.length, dateKey);
+      due = src.builtin ? builtinEntries(list, src.bundle, index) : list.items.filter((i) => (i.seq ?? 0) === index);
+      break;
+    }
     default:
       due = [];
   }
@@ -113,6 +173,8 @@ export function cycleLabel(list, dateKey, { foldShortMonths = true } = {}) {
     }
     case 'dated':
       return formatShort(dateKey);
+    case 'cycle':
+      return '';
     default:
       return 'Daily';
   }
@@ -130,18 +192,64 @@ export function datedRange(list) {
   return first ? { first, last } : null;
 }
 
+function itemSince(item) {
+  if (item.since) return item.since;
+  return item.created ? todayKey(new Date(item.created)) : null;
+}
+
+/**
+ * Entries from earlier days that were not checked off, for lists that change
+ * from day to day (not daily lists). An entry is only carried until it comes
+ * round again, and never from before it was on the list.
+ * @returns {Map<string, Array<{item, date}>>} by list id, oldest first
+ */
+export function carriedOver(state, today, isChecked, { lookback = 60 } = {}) {
+  const opts = { foldShortMonths: state.settings?.foldShortMonths !== false };
+  const out = new Map();
+  for (const list of state.lists) {
+    if (list.hidden || list.type === 'daily') continue;
+    const seen = new Set(itemsDue(list, today, opts).map((i) => i.id));
+    const since = list.since || '0000-00-00';
+    let carried = [];
+    for (let k = 1; k <= lookback; k++) {
+      const date = addDays(today, -k);
+      if (date < since) break;
+      const day = [];
+      for (const item of itemsDue(list, date, opts)) {
+        if (seen.has(item.id)) continue;
+        seen.add(item.id);
+        const from = itemSince(item);
+        if (from && date < from) continue;
+        if (isChecked(date, item.id)) continue;
+        day.push({ item, date });
+      }
+      // Older days first; each day keeps the list's own order.
+      carried = [...day, ...carried];
+    }
+    if (carried.length) out.set(list.id, carried);
+  }
+  return out;
+}
+
 /**
  * Everything due on dateKey, grouped by list (in the lists' order).
- * Hidden lists are skipped. Each group: { list, items, label, needsSetup, cycleEnded }.
+ * Hidden lists are skipped. Each group: { list, items, carried, label, needsSetup, cycleEnded }.
  */
-export function agenda(state, dateKey) {
+export function agenda(state, dateKey, { carried = null } = {}) {
   const opts = { foldShortMonths: state.settings?.foldShortMonths !== false };
   const groups = [];
   for (const list of state.lists) {
     if (list.hidden) continue;
     const items = itemsDue(list, dateKey, opts);
-    const group = { list, items, label: cycleLabel(list, dateKey, opts), needsSetup: false, cycleEnded: false };
-    if (list.items.length === 0 && list.type !== 'daily') group.needsSetup = true;
+    const group = {
+      list,
+      items,
+      carried: carried?.get(list.id) || [],
+      label: cycleLabel(list, dateKey, opts),
+      needsSetup: false,
+      cycleEnded: false,
+    };
+    if (entryCount(list) === 0 && list.type !== 'daily') group.needsSetup = true;
     if (list.type === 'dated' && items.length === 0 && list.items.length) {
       const range = datedRange(list);
       group.cycleEnded = !!range && dateKey > range.last;

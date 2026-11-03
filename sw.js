@@ -2,7 +2,7 @@
 // and served from the cache afterwards. Bump VERSION (and js/version.js) on
 // every release so phones pick up the new files.
 
-const VERSION = '1.0.0';
+const VERSION = '2.0.0';
 const CACHE = `prayer-tracker-${VERSION}`;
 
 const ASSETS = [
@@ -11,19 +11,31 @@ const ASSETS = [
   './manifest.webmanifest',
   './css/app.css',
   './js/app.js',
+  './js/bundles.js',
+  './js/calendar.js',
   './js/dates.js',
   './js/importer.js',
-  './js/liturgy.js',
   './js/lists.js',
+  './js/liturgy.js',
   './js/names.js',
   './js/pdf.js',
+  './js/prayers.js',
+  './js/praythrough.js',
   './js/schedule.js',
   './js/settings.js',
   './js/sheets.js',
   './js/store.js',
+  './js/sync.js',
   './js/today.js',
   './js/ui.js',
   './js/version.js',
+  './js/data/acp.js',
+  './fonts/fraunces-latin-ext-full-italic.woff2',
+  './fonts/fraunces-latin-ext-full-normal.woff2',
+  './fonts/fraunces-latin-full-italic.woff2',
+  './fonts/fraunces-latin-full-normal.woff2',
+  './fonts/instrument-sans-latin-ext-standard-normal.woff2',
+  './fonts/instrument-sans-latin-standard-normal.woff2',
   './icons/apple-touch-icon.png',
   './icons/favicon-32.png',
   './icons/favicon.svg',

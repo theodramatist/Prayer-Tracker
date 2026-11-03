@@ -1,13 +1,14 @@
 # Prayer Tracker
 
 A web app for daily intercessions that you install on your phone's Home Screen. It
-works offline, and everything you enter stays on your device.
+works offline, keeps everything on your device, and can sync between your devices
+through a private GitHub repository of your own.
 
 It keeps four kinds of cycle, and shows everything due on a given day in one place:
 
 | Cycle | Repeats | Comes set up as |
 | --- | --- | --- |
-| **Anglican Cycle of Prayer** | a different diocese or province each calendar date | *Anglican Cycle of Prayer* (load the cycle from its PDF) |
+| **Anglican Cycle of Prayer** | a different diocese or province each day, starting over at the end | *Anglican Cycle of Prayer*, built in (see below) |
 | **Diocesan cycle** | a different church each day of the month (1–31) | *Diocesan Cycle* (paste your diocese's list) |
 | **Parish cycle** | a different list of names each day of the week | *Trinity*: type names First Last; they sort by last name |
 | **Daily** | every day, either ongoing or for a set time you choose when adding | *Prayer Requests*, *Family*, *Clergy* |
@@ -16,30 +17,53 @@ You can rename, reorder, hide or delete any of these, and make more lists of any
 
 ## Using it
 
-- **Today** shows everything for the day, grouped by list. Tap the circle to mark
-  someone prayed for, and they slide away. Undo is on the message at the bottom, and
-  **Show prayed** brings checked items back. Tomorrow starts fresh.
+- **Today** shows the day as a calendar page: the date, the day's feast or Sunday from
+  the Episcopal calendar (with its Proper), and a ribbon in the liturgical colour of the
+  day. Below come your lists, each opening with a prayer from the Book of Common Prayer;
+  tap the prayer to read it in full.
+- Tap the circle to mark someone prayed for, and they slide away. Undo is on the message
+  at the bottom, and **Show prayed** brings checked entries back.
+- **Missed a day?** Cycle entries you didn't check off (the Anglican diocese, the
+  diocesan church, the Trinity names) stay on Today under **From earlier days**, with
+  their date, until you pray for them or come round to them again. **Let these go**
+  clears them. Daily lists simply repeat, so nothing is carried from them.
+- **Pray through the list** opens a quiet full-screen view: each list's prayer, then one
+  entry at a time in large type. **Amen** marks it prayed and moves on; **Skip** and
+  **Back** (or swipe) move without marking.
 - Use the **filter chips** to see one list at a time. Use **‹ ›** or tap the date to
   look at another day.
 - Tap the big **+** to add someone. Pick the list. For daily lists, also pick how long:
   *Ongoing*, *Today only*, *3 days*, *1 week*, *2 weeks*, *1 month*, *3 months*, or
-  *Until…* a date. Paste several lines to add several people at once. The sheet
-  remembers the last list and duration you used.
+  *Until…* a date. Paste several lines to add several people at once.
 - Tap a name to edit it: add details, change its day, set or remove an end date, move it
   to another list, or delete it.
-- The date heading shows the season of the church year, and the accent colour follows
-  it (Advent blue, Lent violet, and so on). You can turn this off in Settings.
+- **Change a list's prayer:** open the list, tap **⋯**, and under Prayer choose another
+  from the Prayer Book, change its words (say, to name your bishop in *For the Diocese*),
+  write your own, or choose none.
 
-### Setting up the cycles
+### The Anglican Cycle of Prayer
 
-**Anglican Cycle of Prayer.** Download the current cycle's PDF from
-[anglicancommunion.org](https://www.anglicancommunion.org/resource/from-abu-to-divine-hope-via-zululand/).
-Then go to **Lists → Anglican Cycle of Prayer → Add the cycle → Choose a file**. You can
-also copy the text and paste it in. Each day's entry has to start with its date. Many
-formats work: `Monday 2 November 2026`, `02-Nov-2026`, `Nov 2, 2026`, `2026-11-02`, or a
-month heading with `2 Monday` under it. A preview shows what was understood before
-anything is saved. The current cycle ends on 31 December 2026. After that, Today
-reminds you to add the next one the same way.
+The app shows the Anglican Communion's cycle one day at a time, and starts it over from
+the beginning when it ends. The current cycle, *From Aba to Divine Hope via Zululand*,
+runs from 1 September 2023 to 31 December 2026. That is exactly 174 weeks, so when it
+restarts on 1 January 2027 each diocese keeps its weekday.
+
+- If a diocese has merged or been renamed, tap it and change the wording; the original
+  is kept underneath so you can restore it. Your edits are listed on the list's page.
+- When the new cycle is published, **Lists → Anglican Cycle of Prayer → Load a newer
+  cycle** reads its PDF (or pasted text) on your device.
+
+**Building the cycle into the app.** The built-in data lives in `js/data/acp.js` and is
+made from the Anglican Communion's PDF with one command:
+
+```
+node scripts/build-acp.mjs path/to/acp_from-aba-to-divine-hope-via-zululand-2023-to-2026_webpdf.pdf \
+  --title "From Aba to Divine Hope via Zululand"
+```
+
+Until that has been run, the app asks you to add the cycle from the PDF instead.
+
+### Setting up the other cycles
 
 **Diocesan cycle.** Paste one church per line, each starting with its day number:
 
@@ -80,7 +104,7 @@ GitHub Pages is the simplest:
 1. GitHub Pages is free for **public** repositories. This repository is private, so
    either make it public (**Settings → General → Danger Zone → Change visibility**) or
    use a paid GitHub plan. Making it public exposes only the code: your names and prayer
-   requests are never stored in the repository. They live on your phone.
+   requests are never stored in this repository.
 2. Go to **Settings → Pages**. Under **Build and deployment**, choose **Deploy from a
    branch**, then pick `main` and `/ (root)`, and save.
 3. After a minute or two the app is at **https://theodramatist.github.io/Prayer-Tracker/**.
@@ -98,14 +122,32 @@ Then install it:
 Web apps can't put true widgets on the Home Screen. On iPhone, quick adding means
 opening the app and tapping **+**. On Android, use the shortcut and Share options above.
 
+## Sync across devices
+
+**Settings → Sync across devices** keeps the same lists on your phone, iPad and
+computer. They're stored as one file, `prayer-tracker.json`, in a **private** GitHub
+repository you own (keep it separate from this one, which may be public):
+
+1. Create a new private repository, for example `prayer-data`.
+2. Make a [fine-grained access token](https://github.com/settings/personal-access-tokens/new):
+   under *Repository access* choose *Only select repositories* and pick that repository;
+   under *Permissions* set *Contents* to *Read and write*.
+3. In the app, enter the repository (`yourname/prayer-data`) and the token. Do the same on
+   each device; the same token works on all of them.
+
+Each device keeps working offline. When it syncs (on opening, every few minutes, and
+shortly after a change), it merges its copy with the file: the newest change to each
+entry wins, deletions are respected, and check-offs made on any device count
+everywhere. The token stays on the device and is never put in backups or in the
+synced file. The app refuses a public repository.
+
 ## Your data and backups
 
-Everything is saved in the browser storage on your device. There are no accounts and
-nothing is uploaded. That also means the app can't recover your lists if you lose your
-phone. Use **Settings → Save a backup** now and then. On a phone this opens the share
-sheet, so you can save the file to Files, iCloud Drive, Google Drive or email.
-**Restore a backup** brings everything back on a new phone. After a few days of use,
-the app reminds you about once a month.
+Everything is saved in the browser storage on your device. Without sync nothing leaves
+it, and the app can't recover your lists if you lose your phone. Use **Settings → Save
+a backup** now and then. On a phone this opens the share sheet, so you can save the
+file to Files, iCloud Drive, Google Drive or email. **Restore a backup** brings
+everything back on a new phone.
 
 ## Development
 
@@ -113,19 +155,32 @@ Requires Node 20+ and no dependencies.
 
 ```
 npm start           # serve the app at http://localhost:8080
-npm test            # unit tests (dates, names, cycles, importers, storage, PWA files)
+npm test            # unit tests: dates, names, cycles, carry-forward, church calendar, importers, storage, sync, PWA files
 npm run test:e2e    # drives the app in Chromium with Playwright; screenshots in tests/e2e/output/
 npm run icons       # re-render the PNG icons from the SVG artwork
 ```
 
-Layout: `index.html`, `css/app.css`, `js/` (ES modules: `schedule.js` decides what is due
-on a date, `importer.js` reads pasted text, `names.js` handles last-name sorting,
-`store.js` handles storage, and `today.js`, `lists.js`, `sheets.js`, `settings.js` are the
-screens), `sw.js` (offline cache), and `manifest.webmanifest`.
+Layout: `index.html`, `css/app.css`, and ES modules in `js/`:
+
+- `schedule.js` decides what is due on a date, including cycles and carry-forward.
+- `calendar.js` holds the BCP 1979 calendar (feasts, named Sundays, Propers, transfers);
+  `liturgy.js` works out seasons and Easter.
+- `prayers.js` holds the Prayer Book prayers; `bundles.js` and `data/acp.js` hold the
+  built-in cycle.
+- `importer.js` reads pasted text and `pdf.js` reads PDFs; `names.js` handles
+  last-name sorting.
+- `store.js` handles storage, with per-entry timestamps and tombstones; `sync.js`
+  handles the merge and the GitHub file.
+- `today.js`, `praythrough.js`, `lists.js`, `sheets.js` and `settings.js` are the screens.
+
+`sw.js` is the offline cache, and `manifest.webmanifest` makes the app installable.
 
 **Releasing a change:** bump the version in both `js/version.js` and `sw.js`. Installed
 copies then fetch the new files and offer to reload. A unit test checks that the two
 versions match and that `sw.js` lists every app file.
 
-PDF reading uses [pdf.js](https://mozilla.github.io/pdf.js/) 6.4.299 (Apache-2.0),
-bundled in `vendor/pdfjs/`. It loads only when you choose a PDF.
+Type: [Fraunces](https://github.com/undercasetype/Fraunces) for headings and prayers and
+[Instrument Sans](https://github.com/Instrument/instrument-sans) for lists, both under the
+SIL Open Font License and bundled in `fonts/`. PDF reading uses
+[pdf.js](https://mozilla.github.io/pdf.js/) 6.4.299 (Apache-2.0), bundled in
+`vendor/pdfjs/` and loaded only when you choose a PDF.

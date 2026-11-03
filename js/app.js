@@ -3,7 +3,8 @@
 
 import { Store, STORAGE_KEY } from './store.js';
 import { todayKey, addDays, isValidKey } from './dates.js';
-import { season } from './liturgy.js';
+import { dayTitle } from './calendar.js';
+import { SyncManager } from './sync.js';
 import { trackVisualViewport, toast, closeAllSheets } from './ui.js';
 import { renderToday } from './today.js';
 import { renderLists, renderListDetail } from './lists.js';
@@ -15,6 +16,7 @@ const root = document.documentElement;
 const view = document.getElementById('view');
 
 const store = new Store();
+const sync = new SyncManager(store);
 
 const ua = navigator.userAgent;
 const platform = {
@@ -33,6 +35,7 @@ function writeUi(patch) {
 
 const app = {
   store,
+  sync,
   platform,
   today: todayKey(),
   viewDate: todayKey(),
@@ -96,7 +99,8 @@ function applyTheme() {
   const { theme = 'auto', seasonalColor = true } = store.state.settings;
   const dark = theme === 'dark' || (theme === 'auto' && darkQuery.matches);
   const nextTheme = dark ? 'dark' : 'light';
-  const nextSeason = seasonalColor ? season(app.today).color : 'none';
+  // The accent is the liturgical colour of the day: the season's, or a feast's.
+  const nextSeason = seasonalColor ? dayTitle(app.today).color : 'none';
   if (root.dataset.theme === nextTheme && root.dataset.season === nextSeason) return;
   root.dataset.theme = nextTheme;
   root.dataset.season = nextSeason;
@@ -129,6 +133,19 @@ window.addEventListener('storage', (e) => {
   if (e.key === STORAGE_KEY) store.reload();
 });
 
+// Sync: on launch, when the app comes back to the front, when the connection
+// returns, every few minutes while open, and shortly after any change.
+let lastSyncState = sync.status.state;
+sync.onChange((status) => {
+  const settled = status.state !== 'syncing';
+  if (app.route.name === 'settings' || (settled && (status.state === 'error' || lastSyncState === 'error'))) render();
+  if (settled) lastSyncState = status.state;
+});
+const syncIfOn = () => { if (sync.enabled && !document.hidden) sync.sync(); };
+document.addEventListener('visibilitychange', syncIfOn);
+window.addEventListener('online', syncIfOn);
+setInterval(syncIfOn, 5 * 60 * 1000);
+
 /** Midnight: move "today" forward (and the view with it, if it was showing today). */
 function checkRollover() {
   const t = todayKey();
@@ -159,6 +176,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
 trackVisualViewport();
 render();
 document.body.classList.add('ready');
+syncIfOn();
 
 // Quick-add links: ./?add opens the add sheet; the Android share sheet sends ?title=&text=&url=.
 const params = new URLSearchParams(location.search);

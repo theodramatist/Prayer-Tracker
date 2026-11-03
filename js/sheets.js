@@ -2,10 +2,12 @@
 // and spreading a weekly list over the week.
 
 import { h, icon, replace, openSheet, confirmSheet, toast, chipGroup, toggle, autoGrow, plural } from './ui.js';
-import { DURATIONS, endDateFor, sortItems, nameOf, planSpread, LIST_TYPES, SORTS } from './schedule.js';
+import { DURATIONS, endDateFor, sortItems, nameOf, planSpread, LIST_TYPES, SORTS, cycleSource } from './schedule.js';
+import { PRAYERS, SOURCE as PRAYER_SOURCE, prayerFor } from './prayers.js';
+import { bundleFor } from './bundles.js';
 import { parseList, parseWeekly, parseMonthly, parseDated } from './importer.js';
 import { parseName, compareNames } from './names.js';
-import { WEEKDAYS, WEEKDAYS_SHORT, addDays, formatShort, formatMedium, formatWithYear, weekday, parseKey, isValidKey, todayKey } from './dates.js';
+import { WEEKDAYS, WEEKDAYS_SHORT, addDays, diffDays, formatShort, formatMedium, formatWithYear, weekday, parseKey, isValidKey, todayKey } from './dates.js';
 import { isPdf, pdfToText } from './pdf.js';
 
 /** The current cycle ("From Abu to Divine Hope via Zululand", Sept 2023 – Dec 2026). */
@@ -106,14 +108,16 @@ const TYPE_ORDER = ['daily', 'weekly', 'monthly', 'dated'];
  */
 export function openAddSheet(app, { text = '', listId = null, date = null, day: presetDay = null } = {}) {
   const { store } = app;
-  const lists = store.state.lists;
+  // Cycles (like the Anglican Cycle) come in whole; you add to the other lists.
+  const lists = store.state.lists.filter((l) => l.type !== 'cycle');
   if (!lists.length) {
     toast('Make a list first (Lists → New list).');
     return null;
   }
   const meta = store.state.meta;
   const start = date || app.viewDate;
-  let list = store.list(listId) || store.list(meta.quickAddList) || lists.find((l) => l.type === 'daily') || lists[0];
+  const pick = (id) => lists.find((l) => l.id === id);
+  let list = pick(listId) || pick(meta.quickAddList) || lists.find((l) => l.type === 'daily') || lists[0];
   let duration = meta.durations?.[list.id] || 'ongoing';
   let until = addDays(start, 6);
   let day = null;
@@ -269,11 +273,13 @@ function describeSchedule(list, item) {
 
 // ---------- edit an item ----------
 
-export function openItemSheet(app, itemId) {
+export function openItemSheet(app, itemId, { list: inList = null, entry = null } = {}) {
   const { store } = app;
+  if (entry?.builtin) return openEntrySheet(app, inList, entry);
   const found = store.findItem(itemId);
   if (!found) return null;
   const { list, item } = found;
+  if (list.type === 'cycle') return openEntrySheet(app, list, item);
   let target = list;
   let day = item.day;
   let date = item.date || app.viewDate;
@@ -334,7 +340,7 @@ export function openItemSheet(app, itemId) {
       target = next;
       renderSchedule();
     },
-  }, store.state.lists.map((l) => h('option', { value: l.id, selected: l.id === list.id }, l.name)));
+  }, store.state.lists.filter((l) => l.type !== 'cycle').map((l) => h('option', { value: l.id, selected: l.id === list.id }, l.name)));
 
   const details = [];
   if (item.created) details.push(`Added ${formatWithYear(todayKey(new Date(item.created)))}`);
@@ -378,6 +384,52 @@ export function openItemSheet(app, itemId) {
   return sheet;
 }
 
+/**
+ * Edit one day's entry in a cycle. A built-in entry (the Anglican Cycle) keeps
+ * the original underneath your edit, so it can be restored.
+ */
+function openEntrySheet(app, list, entry) {
+  const { store } = app;
+  const builtin = !!entry.builtin;
+  const text = h('input', { class: 'input input-lg', value: entry.text, 'aria-label': 'Entry', enterkeyhint: 'done' });
+  const note = h('textarea', { class: 'input', rows: 3, placeholder: 'Details (optional)', 'aria-label': 'Details', value: entry.note || '' });
+  const save = h('button', { class: 'btn btn-primary', type: 'submit' }, 'Save');
+  const remove = h('button', { class: 'btn btn-danger', type: 'button' }, icon('trash'), builtin ? 'Hide' : 'Delete');
+  const restore = builtin && entry.edited ? h('button', { class: 'link-btn', type: 'button' }, 'Restore the original wording') : null;
+  const form = h('form', { class: 'item-form', novalidate: true },
+    builtin && h('p', { class: 'sheet-text' }, `From ${list.name}. If a diocese has merged or been renamed, change it here; this day will show your wording from now on.`),
+    field('Entry', text),
+    field('Details', note),
+    restore,
+    h('div', { class: 'sheet-actions sheet-actions-split' }, remove, save));
+  let sheet;
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const value = text.value.trim();
+    if (!value) { text.focus(); return; }
+    if (builtin) store.overrideEntry(list.id, entry.id, { text: value, note: note.value.trim() || null });
+    else store.updateItem(entry.id, { text: value, note: note.value.trim() || null });
+    sheet.close();
+  });
+  remove.addEventListener('click', () => {
+    sheet.close();
+    if (builtin) {
+      store.overrideEntry(list.id, entry.id, { hidden: true });
+      toast('Hidden from the cycle', { action: 'Undo', onAction: () => store.overrideEntry(list.id, entry.id, null) });
+    } else {
+      const removed = store.deleteItem(entry.id);
+      toast(`Deleted “${short(entry.text, 32)}”`, { action: 'Undo', onAction: () => store.restoreItem(removed) });
+    }
+  });
+  restore?.addEventListener('click', () => {
+    store.overrideEntry(list.id, entry.id, null);
+    sheet.close();
+    toast('Original wording restored');
+  });
+  sheet = openSheet({ title: 'Edit entry', className: 'sheet-item', content: form });
+  return sheet;
+}
+
 // ---------- paste a list ----------
 
 const IMPORT_HELP = {
@@ -385,6 +437,7 @@ const IMPORT_HELP = {
   weekly: 'One name per line, as First Last or Last, First. To set the days, put a day name on its own line (Sunday, Monday…) above that day’s names.',
   monthly: 'One church per line. Start a line with its day number (“2 St Paul’s, Anytown”); lines without a number belong to the day above. With no numbers, line 1 is day 1, line 2 is day 2, and so on.',
   dated: 'Each day’s entry should start with its date, such as “Monday 2 November 2026”, “Nov 2, 2026” or “2026-11-02”. The lines after a date, up to the next date, are that day’s entry.',
+  cycle: 'Each day’s entry should start with its date, such as “Monday 2 November 2026”, “02-Nov-2026” or “2026-11-02”; the lines after it, up to the next date, are that day’s entry. After the last date the cycle starts over.',
 };
 
 const IMPORT_EXAMPLE = {
@@ -392,16 +445,20 @@ const IMPORT_EXAMPLE = {
   weekly: 'Sunday\nMary Adams\nJohn & Sue Baker\nMonday\nSmith, Tom',
   monthly: '1 The Bishop and diocesan staff\n2 St Paul’s, Anytown\n3 Christ Church, Riverside',
   dated: 'Monday 2 November 2026\nThe Diocese of …\nThe Rt Revd …\nTuesday 3 November 2026\n…',
+  cycle: 'Monday 2 November 2026\nThe Diocese of …\nThe Rt Revd …\nTuesday 3 November 2026\n…',
 };
 
 export function openImportSheet(app, listId) {
   const { store } = app;
   const list = store.list(listId);
   if (!list) return null;
-  const isAcp = list.kind === 'acp' || list.type === 'dated';
+  const isAcp = list.kind === 'acp';
+  const isCycle = list.type === 'cycle';
+  const hasBuiltin = isCycle && !!bundleFor(list);
   const nonEmpty = list.items.length > 0;
   let mode = nonEmpty && (list.type === 'monthly' || list.type === 'dated') ? 'replace' : 'add';
   if (nonEmpty && list.type === 'dated') mode = 'merge';
+  if (isCycle) mode = 'cycle';
   let looseDay = list.type === 'weekly' ? (nonEmpty ? suggestWeekday(list, '', app.viewDate) : 'spread') : null;
   let parsed = { entries: [] };
 
@@ -449,7 +506,7 @@ export function openImportSheet(app, listId) {
     if (!raw.trim()) return { entries: [] };
     if (list.type === 'weekly') return parseWeekly(raw);
     if (list.type === 'monthly') return parseMonthly(raw);
-    if (list.type === 'dated') return parseDated(raw, { defaultYear: parseKey(app.today).y });
+    if (list.type === 'dated' || isCycle) return parseDated(raw, { defaultYear: parseKey(app.today).y });
     return { entries: parseList(raw) };
   }
 
@@ -457,10 +514,12 @@ export function openImportSheet(app, listId) {
     parsed = parse();
     const n = parsed.entries.length;
     submit.disabled = n === 0;
-    submit.textContent = n === 0 ? 'Add' : mode === 'replace' ? `Replace with ${n}` : `Add ${n}`;
+    submit.textContent = n === 0 ? 'Add' : isCycle ? `Use these ${plural(cycleDays(), 'day')}` : mode === 'replace' ? `Replace with ${n}` : `Add ${n}`;
     renderLoose();
     renderPreview();
   }
+
+  const cycleDays = () => (parsed.first ? diffDays(parsed.first, parsed.last) + 1 : 0);
 
   function renderLoose() {
     if (list.type !== 'weekly') return;
@@ -482,13 +541,14 @@ export function openImportSheet(app, listId) {
     const es = parsed.entries;
     if (!textarea.value.trim()) { replace(preview); return; }
     if (!es.length) {
-      replace(preview, h('p', { class: 'preview-empty' }, list.type === 'dated'
+      replace(preview, h('p', { class: 'preview-empty' }, list.type === 'dated' || isCycle
         ? 'No dates found yet. Each day’s entry needs to start with a date.'
         : 'Nothing found yet.'));
       return;
     }
     let summary;
     if (list.type === 'dated') summary = `${plural(es.length, 'date')} from ${formatWithYear(parsed.first)} to ${formatWithYear(parsed.last)}`;
+    else if (isCycle) summary = `${plural(cycleDays(), 'day')}, ${formatWithYear(parsed.first)} to ${formatWithYear(parsed.last)}, then it starts over`;
     else if (list.type === 'monthly') summary = `${plural(es.length, 'entry', 'entries')} on ${plural(new Set(es.map((e) => e.day)).size, 'day')} of the month`;
     else if (list.type === 'weekly') {
       const dayCount = new Set(es.map((e) => e.day).filter((d) => d != null)).size;
@@ -507,7 +567,7 @@ export function openImportSheet(app, listId) {
   }
 
   function previewKey(e) {
-    if (list.type === 'dated') return formatMedium(e.date);
+    if (list.type === 'dated' || isCycle) return formatMedium(e.date);
     if (list.type === 'monthly') return `Day ${e.day}`;
     if (list.type === 'weekly') {
       const d = e.day ?? looseDay;
@@ -522,10 +582,13 @@ export function openImportSheet(app, listId) {
 
   const form = h('form', { class: 'import-form', novalidate: true },
     h('p', { class: 'sheet-text' }, IMPORT_HELP[list.type]),
-    isAcp && list.type === 'dated' && h('p', { class: 'sheet-text' },
-      'For the Anglican Cycle of Prayer, download the PDF from ',
+    isAcp && h('p', { class: 'sheet-text' },
+      hasBuiltin
+        ? 'The current cycle is built in. When a new one is published, download its PDF from '
+        : 'Download the cycle’s PDF from ',
       h('a', { href: ACP_URL, target: '_blank', rel: 'noopener' }, 'anglicancommunion.org'),
-      ' and choose it below, or copy all of its text and paste it here.'),
+      ' and choose it below, or copy its text and paste it here.',
+      hasBuiltin ? ' It takes the place of the built-in cycle; you can switch back in the list’s settings.' : ''),
     textarea,
     h('div', { class: 'import-tools' },
       h('button', { type: 'button', class: 'btn btn-sm', onclick: () => pasteFromClipboard() }, icon('paste'), 'Paste'),
@@ -533,7 +596,7 @@ export function openImportSheet(app, listId) {
       fileInput),
     status,
     looseField,
-    nonEmpty && field('This list already has entries',
+    nonEmpty && !isCycle && field('This list already has entries',
       chipGroup({ label: 'Add or replace', wrap: true, value: mode, options: modeOptions, onChange: (v) => { mode = v; update(); } })),
     preview,
     h('div', { class: 'sheet-actions' }, submit));
@@ -560,13 +623,20 @@ export function openImportSheet(app, listId) {
     if (list.type === 'weekly') {
       entries = es.map((en) => ({ ...en, day: en.day ?? (looseDay === 'spread' ? 0 : looseDay) }));
     }
-    if (mode === 'replace') {
+    if (isCycle) {
+      const start = parsed.first;
+      store.replaceCycle(list.id, { start, entries: entries.map((en) => ({ ...en, seq: diffDays(start, en.date) })) });
+    } else if (mode === 'replace') {
       store.replaceItems(list.id, entries);
     } else if (mode === 'merge') {
       const dates = new Set(entries.map((en) => en.date));
       store.commit((s) => {
         const l = s.lists.find((x) => x.id === list.id);
-        l.items = l.items.filter((i) => !dates.has(i.date));
+        const t = store.stamp();
+        l.items = l.items.filter((i) => {
+          if (dates.has(i.date)) { s.tombstones[i.id] = t; return false; }
+          return true;
+        });
       }, { silent: true });
       store.addItems(list.id, entries);
     } else {
@@ -576,14 +646,16 @@ export function openImportSheet(app, listId) {
     if (list.hidden) store.updateList(list.id, { hidden: false });
     requestPersistentStorage();
     sheet.close();
-    toast(`${mode === 'replace' ? 'Replaced with' : 'Added'} ${plural(es.length, list.type === 'dated' ? 'date' : 'entry', list.type === 'dated' ? 'dates' : 'entries')}`, {
+    const what = isCycle ? `Now using ${plural(cycleDays(), 'day')} from ${formatWithYear(parsed.first)}`
+      : `${mode === 'replace' ? 'Replaced with' : 'Added'} ${plural(es.length, list.type === 'dated' ? 'date' : 'entry', list.type === 'dated' ? 'dates' : 'entries')}`;
+    toast(what, {
       action: 'Undo',
       onAction: () => store.restore(snap),
     });
   });
 
   update();
-  sheet = openSheet({ title: list.type === 'dated' ? 'Add the cycle' : `Paste into ${list.name}`, className: 'sheet-import', content: form });
+  sheet = openSheet({ title: isCycle ? (hasBuiltin ? 'Load a newer cycle' : 'Add the cycle') : `Paste into ${list.name}`, className: 'sheet-import', content: form });
   return sheet;
 }
 
@@ -623,11 +695,23 @@ export function openListSheet(app, listId = null) {
 
   const save = h('button', { class: 'btn btn-primary', type: 'submit' }, existing ? 'Save' : 'Create list');
   const del = existing && h('button', { class: 'btn btn-danger', type: 'button' }, icon('trash'), 'Delete list');
+  const prayer = existing ? prayerEditor(existing) : null;
+  const builtinBack = existing?.type === 'cycle' && existing.items.length > 0 && bundleFor(existing)
+    && h('button', {
+      class: 'link-btn',
+      type: 'button',
+      onclick: () => {
+        const snap = store.snapshot();
+        store.replaceCycle(existing.id, { start: existing.start, entries: [] });
+        sheet.close();
+        toast('Back to the built-in cycle', { action: 'Undo', onAction: () => store.restore(snap) });
+      },
+    }, 'Switch back to the built-in cycle');
 
   const form = h('form', { class: 'list-form', novalidate: true },
     field('Name', name),
     typeField,
-    field('Order', chipGroup({
+    (!existing || existing.type !== 'cycle') && field('Order', chipGroup({
       label: 'Order',
       wrap: true,
       value: sort,
@@ -635,6 +719,8 @@ export function openListSheet(app, listId = null) {
       onChange: (v) => { sort = v; },
     })),
     existing && toggle({ label: 'Show on Today', checked: !hidden, onChange: (v) => { hidden = !v; } }),
+    prayer?.el,
+    builtinBack,
     h('div', { class: `sheet-actions ${existing ? 'sheet-actions-split' : ''}` }, del, save));
 
   let sheet;
@@ -643,7 +729,9 @@ export function openListSheet(app, listId = null) {
     const value = name.value.trim();
     if (!value) { name.focus(); return; }
     if (existing) {
-      store.updateList(existing.id, { name: value, sort, hidden });
+      const patch = { name: value, sort, hidden };
+      if (prayer.changed()) patch.prayer = prayer.value();
+      store.updateList(existing.id, patch);
       sheet.close();
     } else {
       const list = store.addList({ name: value, type, sort });
@@ -670,6 +758,50 @@ export function openListSheet(app, listId = null) {
   sheet = openSheet({ title: existing ? 'List settings' : 'New list', className: 'sheet-list', content: form });
   if (!existing) name.focus();
   return sheet;
+}
+
+/**
+ * The prayer that opens a list: any prayer from the Prayer Book, edited as
+ * you like, your own words, or none. Returns { el, value(), changed() }.
+ */
+function prayerEditor(list) {
+  const current = prayerFor(list);
+  let choice = current ? (current.key && list.prayer?.text == null ? current.key : 'own') : 'none';
+  const title = h('input', { class: 'input', value: current?.title || '', placeholder: 'Title, e.g. For our Bishop', 'aria-label': 'Prayer title' });
+  const text = h('textarea', { class: 'input prayer-input', rows: 6, value: current?.text || '', 'aria-label': 'Prayer', placeholder: 'Write the prayer…' });
+  const editRow = h('div', { class: 'prayer-edit', hidden: choice === 'none' }, title, text);
+  const select = h('select', {
+    class: 'input',
+    'aria-label': 'Prayer',
+    onchange: () => {
+      choice = select.value;
+      editRow.hidden = choice === 'none';
+      if (PRAYERS[choice]) {
+        title.value = PRAYERS[choice].title;
+        text.value = PRAYERS[choice].text;
+      } else if (choice === 'own') {
+        text.focus();
+      }
+    },
+  },
+  h('option', { value: 'none', selected: choice === 'none' }, 'No prayer'),
+  h('optgroup', { label: PRAYER_SOURCE },
+    Object.entries(PRAYERS).map(([key, p]) => h('option', { value: key, selected: choice === key }, p.title))),
+  h('option', { value: 'own', selected: choice === 'own' }, 'My own words'));
+  const start = JSON.stringify(current);
+  const value = () => {
+    if (choice === 'none') return null;
+    const base = PRAYERS[choice];
+    // An unedited Prayer Book prayer is stored by name; anything edited is stored as written.
+    if (base && title.value === base.title && text.value === base.text) return { key: choice };
+    if (!text.value.trim()) return null;
+    return { title: title.value.trim() || 'Prayer', text: text.value.trim(), key: base ? choice : null };
+  };
+  const el = field('Prayer',
+    h('p', { class: 'hint field-hint' }, 'Said at the start of this list on Today and in pray-through. Choose one, then change its words if you like.'),
+    select,
+    editRow);
+  return { el, value, changed: () => JSON.stringify(value() && prayerFor({ ...list, prayer: value() })) !== start };
 }
 
 // ---------- spread a weekly list ----------
