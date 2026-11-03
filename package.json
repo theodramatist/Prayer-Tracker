@@ -1,0 +1,13 @@
+{
+  "name": "prayer-tracker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "An installable web app for daily intercessions: the Anglican Cycle of Prayer, a monthly diocesan cycle, a weekly parish list and daily prayer requests.",
+  "type": "module",
+  "scripts": {
+    "start": "node scripts/serve.mjs",
+    "test": "node --test 'tests/unit/*.test.mjs'",
+    "test:e2e": "node tests/e2e/run.mjs",
+    "icons": "node scripts/make-icons.mjs"
+  }
+}
