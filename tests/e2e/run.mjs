@@ -96,14 +96,23 @@ async function goToday() {
 
 console.log('Prayer Tracker end-to-end\n Part 1: lists, cycles, check-offs, backup, offline');
 
-await step('first run: the Anglican Cycle is built in; the other two cycles ask to be set up', async () => {
+await step('first run: the Anglican Cycle is built in, the diocese’s cycles are filled in, Trinity asks to be set up', async () => {
   await page.goto(BASE);
   await page.locator('.day-head h1').waitFor();
   assert.equal(await heading(), 'Monday, November 2');
   assert.equal(await page.locator('.feast').innerText(), 'Season after Pentecost');
   assert.deepEqual(await texts('.group[data-list=anglican] .item-text'), ['The Diocese of Carlisle']);
   assert.deepEqual(await texts('.group[data-list=anglican] .item-note'), ['The Church of England']);
-  assert.deepEqual(await texts('.setup-card h2'), ['Diocesan Cycle', 'Trinity']);
+  // The 2nd of the month in the diocese's monthly cycle, with each church's clergy.
+  assert.equal(await page.locator('.group[data-list=diocese] .group-label').innerText(), 'DAY 2');
+  assert.deepEqual(await texts('.group[data-list=diocese] .item-text'), ['St. John’s, Sparta', 'St. Andrew’s, Monroe', 'St. Mark’s, Milwaukee']);
+  assert.deepEqual(await texts('.group[data-list=diocese] .item-note'), [
+    'Kathleen Charles, Long-term supply · Janet Leigh Sterken, Deacon',
+    'Don Fleischman, Priest-in-Charge · John Hickey, Associate · Michelle Mooney, Deacon']);
+  assert.deepEqual(await texts('.group[data-list=diocese-daily] .item-text'), ['Esther Kramer']);
+  assert.deepEqual(await texts('.group[data-list=diocese-daily] .item-note'), ['Rector, St. Aiden’s, Hartford']);
+  assert.equal(await page.locator('.group[data-list=diocese-daily] .prayer-title').innerText(), 'FOR CLERGY AND PEOPLE');
+  assert.deepEqual(await texts('.setup-card h2'), ['Trinity']);
   await shot('01-first-run');
 });
 
@@ -132,10 +141,10 @@ await step('the add sheet remembers the last list and its duration', async () =>
 });
 
 await step('checking off makes an item disappear; undo brings it back', async () => {
-  assert.equal(await page.locator('.progress-text').innerText(), '0 of 5 prayed');
+  assert.equal(await page.locator('.progress-text').innerText(), '0 of 9 prayed');
   await page.locator('.item', { hasText: 'Mom' }).locator('.check').click();
   await eventually(async () => assert.deepEqual(await texts('.group[data-list=family] .item-text'), ['Dad', 'Aunt Sue']));
-  assert.equal(await page.locator('.progress-text').innerText(), '1 of 5 prayed');
+  assert.equal(await page.locator('.progress-text').innerText(), '1 of 9 prayed');
   await page.locator('.toast.show .toast-action').click();
   await eventually(async () => assert.deepEqual(await texts('.group[data-list=family] .item-text'), ['Mom', 'Dad', 'Aunt Sue']));
   await page.locator('.item', { hasText: 'Mom' }).locator('.check').click();
@@ -148,13 +157,13 @@ await step('"Show prayed" reveals checked items, which can be unchecked', async 
   await page.locator('.items-done .check').click();
   await eventually(async () => assert.equal(await page.locator('.items-done').count(), 0));
   await page.locator('.item', { hasText: 'Mom' }).locator('.check').click();
-  await eventually(async () => assert.equal(await page.locator('.progress-text').innerText(), '1 of 5 prayed'));
+  await eventually(async () => assert.equal(await page.locator('.progress-text').innerText(), '1 of 9 prayed'));
 });
 
 await step('check-offs and items survive a reload', async () => {
   await page.reload();
   await page.locator('.day-head h1').waitFor();
-  assert.equal(await page.locator('.progress-text').innerText(), '1 of 5 prayed');
+  assert.equal(await page.locator('.progress-text').innerText(), '1 of 9 prayed');
   assert.deepEqual(await texts('.group[data-list=family] .item-text'), ['Dad', 'Aunt Sue']);
 });
 
@@ -208,7 +217,9 @@ await step('Trinity: spread everyone over the week alphabetically', async () => 
   await page.locator('.toolbar button', { hasText: 'Spread over the week' }).click();
   const sheet = page.locator('.sheet-spread');
   await sheet.waitFor();
-  await sheet.locator('.chip', { hasText: 'Sun' }).click(); // skip Sundays
+  // Monday to Friday unless chosen otherwise; add Saturday.
+  assert.deepEqual(await texts('.sheet-spread .chip.on'), ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']);
+  await sheet.locator('.chip', { hasText: 'Sat' }).click();
   const preview = await sheet.locator('.spread-preview li').allInnerTexts();
   assert.equal(preview.length, 6);
   await shot('04-spread');
@@ -221,6 +232,45 @@ await step('Trinity: spread everyone over the week alphabetically', async () => 
   }
   assert.deepEqual(order, ['Mary Adams', 'John & Sue Baker', 'Grace Brown', 'Bob Carter', 'Lee Chen', 'Maria de la Cruz', "Pat O'Brien", 'Tom Smith', 'Ann Zeller']);
   await shot('05-trinity-list');
+});
+
+await step('a member directory (CSV) with preferred names is spread over Monday to Friday', async () => {
+  await page.click('.tabbar a[href="#/lists"]');
+  await page.locator('button', { hasText: 'New list' }).click();
+  const make = page.locator('.sheet-list');
+  await make.waitFor();
+  await make.locator('input.input-lg').fill('Choir');
+  await make.locator('.type-card', { hasText: 'Weekly' }).click();
+  await make.locator('.chip', { hasText: 'Last name' }).click();
+  await make.locator('button[type=submit]').click();
+  await page.locator('.list-title h1', { hasText: 'Choir' }).waitFor();
+  const csv = ['First Name,Preferred Name,Last Name', 'Katherine,Kate,Abbot', 'Robert,Bob,Abbot', 'Ann,,Brent', 'Carl,,Coyle',
+    'Dorothy,Dot,Drury', 'Ed,,Esmond', 'Frances,Fran,Fenwick', 'Gail,,Garth', 'Hugh,,Halloran', 'Ivy,,Ingram', 'Ines,,Vale Moreno'].join('\r\n');
+  await page.locator('.toolbar button', { hasText: 'Paste a list' }).click();
+  const sheet = page.locator('.sheet-import');
+  await sheet.waitFor();
+  await sheet.locator('textarea.import-text').fill(csv);
+  await eventually(async () => assert.equal(await sheet.locator('.preview-summary').innerText(), '11 names, spread over 5 days'));
+  assert.equal(await sheet.locator('.chip.on', { hasText: 'Spread A–Z' }).count(), 1);
+  assert.deepEqual(await texts('.sheet-import .chips-spread .chip.on'), ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']);
+  assert.deepEqual(await texts('.sheet-import .spread-preview .preview-key'), ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']);
+  await shot('05a-import-csv');
+  await sheet.locator('button[type=submit]').click();
+  await sheet.waitFor({ state: 'detached' });
+  const day = (name) => page.locator('.detail-section', { hasText: name }).first().locator('.row-text').allInnerTexts();
+  assert.deepEqual(await day('Monday'), ['Bob Abbot', 'Kate Abbot']); // preferred names, by last name then first
+  assert.deepEqual(await day('Tuesday'), ['Ann Brent', 'Carl Coyle']);
+  assert.deepEqual(await day('Sunday'), []);
+  assert.deepEqual(await day('Saturday'), []);
+  assert.deepEqual((await day('Friday')).slice(-1), ['Ines Vale Moreno']);
+  // Remembered for next time.
+  await page.locator('.toolbar button', { hasText: 'Spread over the week' }).click();
+  assert.deepEqual(await texts('.sheet-spread .chip.on'), ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']);
+  await page.locator('.sheet-spread .sheet-close').click();
+  await page.locator('button[aria-label="List settings"]').click();
+  await page.locator('.sheet-list .btn-danger').click();
+  await page.locator('.sheet-confirm .btn-danger-fill').click();
+  await page.locator('a.list-card').first().waitFor();
 });
 
 await step('Trinity: a new name is suggested for its alphabetical day', async () => {
@@ -241,9 +291,10 @@ const saints = ['Andrew', 'Barnabas', 'Christopher', 'David', 'Edmund', 'Francis
   'Vincent', 'Wilfrid', 'Xavier', 'Yolanda', 'Zita', 'Alban', 'Bede', 'Columba', 'Dunstan', 'Elizabeth'];
 const DIOCESE = ['Diocesan Cycle of Prayer', ...saints.map((s, i) => `${i + 1}. St. ${s}’s, Town ${i + 1} — The Rev. Rector ${i + 1}`)].join('\n');
 
-await step('Diocese: paste a numbered month; today shows day 2', async () => {
+await step('Diocese: paste a numbered month in place of the built-in one; today shows day 2', async () => {
   const sheet = await pasteInto('diocese', DIOCESE);
   assert.equal(await sheet.locator('.preview-summary').innerText(), '31 entries on 31 days of the month');
+  assert.equal(await sheet.locator('button[type=submit]').innerText(), 'Replace with 31');
   await sheet.locator('button[type=submit]').click();
   await sheet.waitFor({ state: 'detached' });
   await goToday();
@@ -256,6 +307,62 @@ await step('Diocese: on November 30 the 31st is included', async () => {
   await page.evaluate(() => window.prayerTracker.setDate('2026-11-30'));
   assert.equal(await page.locator('.group[data-list=diocese] .group-label').innerText(), 'DAYS 30–31');
   assert.equal(await page.locator('.group[data-list=diocese] .item').count(), 2);
+  await page.evaluate(() => window.prayerTracker.setDate('2026-11-02'));
+});
+
+await step('Diocese: start again from the diocese’s own monthly cycle', async () => {
+  await openList('diocese');
+  await page.locator('button[aria-label="List settings"]').click();
+  await page.locator('.sheet-list .link-btn', { hasText: 'Start again from the diocese’s monthly cycle' }).click();
+  const confirm = page.locator('.sheet-confirm');
+  await confirm.waitFor();
+  assert.match(await confirm.innerText(), /Its 31 entries are replaced by the 105 entries in the diocese’s monthly cycle/);
+  await confirm.locator('.btn-danger-fill').click();
+  await eventually(async () => assert.match(await page.locator('.toast.show').innerText(), /105 entries from the diocese’s monthly cycle/));
+  await page.locator('.sheet-list').waitFor({ state: 'detached' });
+  assert.deepEqual(await page.locator('.detail-section', { hasText: 'Day 2' }).first().locator('.row-text').allInnerTexts(), ['St. John’s, Sparta', 'St. Andrew’s, Monroe', 'St. Mark’s, Milwaukee']);
+  await shot('05b-diocese-list');
+  await goToday();
+  assert.deepEqual(await texts('.group[data-list=diocese] .item-text'), ['St. John’s, Sparta', 'St. Andrew’s, Monroe', 'St. Mark’s, Milwaukee']);
+});
+
+await step('a list read out in one go (say, at Morning Prayer) can be marked prayed in one tap', async () => {
+  await page.locator('.group[data-list=diocese] .group-foot .link-btn', { hasText: 'Prayed for all 3' }).click();
+  await eventually(async () => assert.equal(await page.locator('.group[data-list=diocese] .items .item').count(), 0));
+  assert.match(await page.locator('.toast.show').innerText(), /Prayed for all 3/);
+  await page.locator('.toast.show .toast-action').click();
+  await eventually(async () => assert.equal(await page.locator('.group[data-list=diocese] .items .item').count(), 3));
+});
+
+await step('Diocesan Daily Cycle: next year’s PDF goes in alongside this year’s', async () => {
+  // A stand-in for the diocese's daily PDF: a heading, a month, then numbered days.
+  const people = ['Ann Able, Rector, St. Alban’s, Ayton', 'Bob Baker, Retired Priest', 'Cal Cole, Deacon, Grace, Beeton',
+    'Dee Dale, PiC, St. Luke’s, Ceeton', 'Eve Ennis, Retired Deacon', 'Fay Fox, Priest CR', 'Gus Gale, Rector, Trinity, Deeton',
+    'Hal Hale, Retired Priest', 'Ida Ives, Deacon, St. Paul’s, Eeton', 'Jo Jay, Retired Priest', 'Kit Kay, Rector, Zion, Feeton',
+    'Lu Lee, Retired Priest'];
+  const pdfPage = await context.newPage();
+  await pdfPage.setContent(`<style>body{font:13px Helvetica;margin:40px} p{margin:0 0 3px}</style>
+    <p>Daily Cycle of Prayer 2027 Updated 1/5/2027</p><p>JANUARY</p>${people.map((x, i) => `<p>${i + 1} ${x}</p>`).join('')}`);
+  const pdfPath = `${OUT}daily-sample.pdf`;
+  await pdfPage.pdf({ path: pdfPath, format: 'Letter' });
+  await pdfPage.close();
+
+  await openList('diocese-daily');
+  await page.locator('.toolbar button', { hasText: 'Add dates' }).click();
+  const sheet = page.locator('.sheet-import');
+  await sheet.waitFor();
+  await sheet.locator('input[type=file]').setInputFiles(pdfPath);
+  await eventually(async () => assert.equal(await sheet.locator('.preview-summary').innerText(), '12 dates from Jan 1, 2027 to Jan 12, 2027'), 15000);
+  assert.equal(await sheet.locator('.chip.on', { hasText: 'Add, replacing those dates' }).count(), 1);
+  await shot('05c-import-daily');
+  await sheet.locator('button[type=submit]').click();
+  await sheet.waitFor({ state: 'detached' });
+  await goToday();
+  await page.evaluate(() => window.prayerTracker.setDate('2027-01-04'));
+  assert.deepEqual(await texts('.group[data-list=diocese-daily] .item-text'), ['Dee Dale']);
+  assert.deepEqual(await texts('.group[data-list=diocese-daily] .item-note'), ['Priest-in-Charge, St. Luke’s, Ceeton']);
+  await page.evaluate(() => window.prayerTracker.setDate('2026-11-03'));
+  assert.deepEqual(await texts('.group[data-list=diocese-daily] .item-text'), ['Lynn Zobel']); // this year's are still there
   await page.evaluate(() => window.prayerTracker.setDate('2026-11-02'));
 });
 
@@ -327,7 +434,7 @@ await step('filter chips show one list at a time', async () => {
   assert.deepEqual(await texts('.group h2'), ['Family']);
   await shot('08-filtered');
   await page.locator('.filter-chips .chip', { hasText: 'All' }).click();
-  assert.deepEqual(await texts('.group h2'), ['Anglican Cycle of Prayer', 'Diocesan Cycle', 'Trinity', 'Prayer Requests', 'Family']);
+  assert.deepEqual(await texts('.group h2'), ['Anglican Cycle of Prayer', 'Diocesan Cycle', 'Diocesan Daily Cycle', 'Trinity', 'Prayer Requests', 'Family']);
 });
 
 await step('edit an item: rename, add a note, set an end date, move lists', async () => {
@@ -394,7 +501,7 @@ await step('all prayed shows a closing response', async () => {
 
 await step('Lists and Settings screens render', async () => {
   await page.click('.tabbar a[href="#/lists"]');
-  assert.deepEqual(await texts('.lc-name'), ['Anglican Cycle of Prayer', 'Diocesan Cycle', 'Trinity', 'Prayer Requests', 'Family', 'Clergy']);
+  assert.deepEqual(await texts('.lc-name'), ['Anglican Cycle of Prayer', 'Diocesan Cycle', 'Diocesan Daily Cycle', 'Trinity', 'Prayer Requests', 'Family', 'Clergy']);
   await shot('10-lists');
   await page.click('a[href="#/settings"]');
   await page.locator('.page-title').waitFor();
@@ -414,7 +521,9 @@ await step('backup: save, erase everything, restore', async () => {
   await page.locator('button', { hasText: 'Erase all data' }).click();
   await page.locator('.sheet-confirm .btn-danger-fill').click();
   await goToday();
-  assert.equal(await page.locator('.setup-card').count(), 2); // the built-in Anglican Cycle needs no setup
+  // As on a first run: the Anglican Cycle is built in and the diocese's cycles are filled in again.
+  assert.deepEqual(await texts('.setup-card h2'), ['Trinity']);
+  assert.equal(await page.locator('.group[data-list=diocese] .item').count(), 3);
 
   await page.click('.tabbar a[href="#/lists"]');
   await page.click('a[href="#/settings"]');
@@ -472,6 +581,11 @@ const context2 = await browser.newContext({
   locale: 'en-US', timezoneId: 'America/New_York', serviceWorkers: 'block',
 });
 await context2.route('**/js/data/acp.js', (route) => route.fulfill({ contentType: 'text/javascript', body: FAKE_ACP }));
+// And for js/data/diocese.js, with entries only on the 15th, so they stay out of the way.
+const FAKE_DIOCESE = `export default { id: 'wistest', diocese: 'Test diocese', updated: ${Date.parse('2026-11-01T00:00:00Z')},
+  monthly: [{ day: 15, text: 'St. Test’s, Testville', note: 'Tess Tester, Rector' }],
+  daily: [{ date: '2026-11-15', text: 'Tess Tester', note: 'Rector, St. Test’s, Testville' }] };`;
+await context2.route('**/js/data/diocese.js', (route) => route.fulfill({ contentType: 'text/javascript', body: FAKE_DIOCESE }));
 await context2.route('https://api.github.com/**', async (route) => {
   const req = route.request();
   const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'authorization, content-type, accept, x-github-api-version', 'access-control-allow-methods': 'GET, PUT, OPTIONS' };
@@ -499,7 +613,7 @@ await step('the built-in Anglican Cycle shows today’s diocese, with nothing to
   await page.locator('.day-head h1').waitFor();
   assert.deepEqual(await texts('.group[data-list=anglican] .item-text'), ['The Diocese of Delta (Example)']);
   assert.deepEqual(await texts('.group[data-list=anglican] .item-note'), ['The Rt Revd Delta Bishop']);
-  assert.deepEqual(await texts('.setup-card h2'), ['Diocesan Cycle', 'Trinity']);
+  assert.deepEqual(await texts('.setup-card h2'), ['Trinity']);
   // Ten days from Oct 30, then it starts over.
   await page.evaluate(() => window.prayerTracker.setDate('2026-11-09'));
   assert.deepEqual(await texts('.group[data-list=anglican] .item-text'), ['The Diocese of Alpha (Example)']);
@@ -647,6 +761,27 @@ await step('sync: refuses a bad token, connects to a private repository, and pic
   // A change here goes back up.
   await page.locator('.item', { hasText: 'Grandma' }).locator('.check').click();
   await eventually(async () => assert.ok((ghDoc().checks['2026-11-03'] || {})['from-ipad'] > 0), 6000);
+});
+
+await step('colours: burgundy on ivory unless blue or the church year is chosen', async () => {
+  const root = (k) => page.evaluate((key) => document.documentElement.dataset[key], k);
+  const accent = () => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--accent').trim());
+  assert.equal(await root('palette'), 'burgundy');
+  assert.equal(await accent(), '#8a2433');
+  await page.click('.tabbar a[href="#/lists"]');
+  await page.click('a[href="#/settings"]');
+  const chips = page.locator('.chips-palette');
+  assert.equal(await chips.locator('.chip.on').innerText(), 'Burgundy');
+  await chips.locator('.chip', { hasText: 'Blue' }).click();
+  await eventually(async () => assert.equal(await root('palette'), 'blue'));
+  assert.equal(await accent(), '#284878');
+  await shot('32-settings-blue');
+  await chips.locator('.chip', { hasText: 'Church year' }).click();
+  await eventually(async () => assert.equal(await root('palette'), 'season'));
+  assert.notEqual(await accent(), '#284878');
+  await chips.locator('.chip', { hasText: 'Burgundy' }).click();
+  await eventually(async () => assert.equal(await accent(), '#8a2433'));
+  await goToday();
 });
 
 await step('part 2 light and dark screenshots', async () => {

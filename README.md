@@ -4,13 +4,14 @@ A web app for daily intercessions that you install on your phone's Home Screen. 
 works offline, keeps everything on your device, and can sync between your devices
 through a private GitHub repository of your own.
 
-It keeps four kinds of cycle, and shows everything due on a given day in one place:
+It keeps several kinds of cycle, and shows everything due on a given day in one place:
 
 | Cycle | Repeats | Comes set up as |
 | --- | --- | --- |
 | **Anglican Cycle of Prayer** | a different diocese or province each day, starting over at the end | *Anglican Cycle of Prayer*, built in: nothing to set up |
-| **Diocesan cycle** | a different church each day of the month (1–31) | *Diocesan Cycle* (paste your diocese's list) |
-| **Parish cycle** | a different list of names each day of the week | *Trinity*: type names First Last; they sort by last name |
+| **Diocesan cycle** | a different church each day of the month (1–31) | *Diocesan Cycle*: the Episcopal Diocese of Wisconsin's 97 churches, each with its clergy |
+| **Diocesan daily cycle** | one name for each date of the year | *Diocesan Daily Cycle*: the diocese's 2026 Daily Cycle of Prayer |
+| **Parish cycle** | a different list of names each day of the week | *Trinity*: import the member list, or type names First Last; they sort by last name |
 | **Daily** | every day, either ongoing or for a set time you choose when adding | *Prayer Requests*, *Family*, *Clergy* |
 
 You can rename, reorder, hide or delete any of these, and make more lists of any type.
@@ -23,6 +24,8 @@ You can rename, reorder, hide or delete any of these, and make more lists of any
   tap the prayer to read it in full.
 - Tap the circle to mark someone prayed for, and they slide away. Undo is on the message
   at the bottom, and **Show prayed** brings checked entries back.
+- **Prayed for all** under a list marks everyone on it at once: for a list read out in
+  one go, such as the day's Trinity names at Morning Prayer.
 - **Missed a day?** Cycle entries you didn't check off (the Anglican diocese, the
   diocesan church, the Trinity names) stay on Today under **From earlier days**, with
   their date, until you pray for them or come round to them again. **Let these go**
@@ -40,6 +43,9 @@ You can rename, reorder, hide or delete any of these, and make more lists of any
 - **Change a list's prayer:** open the list, tap **⋯**, and under Prayer choose another
   from the Prayer Book, change its words (say, to name your bishop in *For the Diocese*),
   write your own, or choose none.
+- **Colours:** Settings → Colour. *Burgundy* on warm ivory is the default; *Blue* is deep
+  blue on linen; *Church year* tints the whole app in the liturgical colour of the day,
+  as the ribbon on Today always shows it. Each has a dark version.
 
 ### The Anglican Cycle of Prayer
 
@@ -71,9 +77,43 @@ because the app shows the Episcopal calendar instead.
 The Anglican Cycle of Prayer is © The Anglican Consultative Council 2023. It may be
 freely copied and shared on the condition that no charge is made for its use.
 
+### The Diocese of Wisconsin's cycles
+
+The app starts with the Episcopal Diocese of Wisconsin's two cycles already in place,
+built from its 2026 Sunday-by-Sunday cycle and its 2026 Daily Cycle of Prayer:
+
+- **Diocesan Cycle** (monthly): all 97 churches of the Sunday cycle, one or more each
+  day from the 1st to the 28th, in the Sunday cycle's order; the companion churches and
+  diocese-wide petitions are on the 29th to the 31st. Under each church are its clergy as
+  the daily cycle names them, with their roles (Rector, Priest-in-Charge, Deacon and so
+  on). 14 churches have no clergy named in the daily cycle, so none are shown.
+- **Diocesan Daily Cycle** (by date): the daily cycle as printed, one entry a day, with
+  each person's role and church beneath.
+
+Both are ordinary lists: tap a church to change its clergy, move it to another day, or
+delete it, and add new ones with **+**. Your changes sync like anything else. To start
+again from the diocese's version, open the list, tap **⋯** and choose **Start again from
+the diocese's monthly cycle** (you can undo it).
+
+**Each new year's daily cycle.** When the diocese publishes the next Daily Cycle of
+Prayer as a PDF, go to **Lists → Diocesan Daily Cycle → Add dates → Choose a file** and
+pick it (on Today, the list also offers **Add more** once its last date has passed). The
+app reads the month-by-month layout (a month name, then each day's number and name) and
+adds those dates; earlier years stay unless you choose **Replace everything**. The 2026
+PDF reads this way to exactly the 307 dates built in.
+
+The monthly cycle doesn't change by itself when clergy move: change the church's
+details in the app, or rebuild it from the new daily cycle with
+`node scripts/build-diocese.mjs path/to/DailyCycle.pdf --report report.md`. The script holds the
+Sunday-by-Sunday cycle as transcribed, matches each clergy listing to its church, and
+writes `js/data/diocese.js` and a report of how every church was clergyed and what needs
+a look. A few listings needed judgment: the Northern Highlands Benefice clergy are shown
+at its four parishes (Hayward, Rice Lake, Spooner, Springbrook), and "Trinity, Wausau"
+in the 2026 daily cycle is Trinity, Wauwatosa.
+
 ### Setting up the other cycles
 
-**Diocesan cycle.** Paste one church per line, each starting with its day number:
+**Another diocese's cycle.** Paste one church per line, each starting with its day number:
 
 ```
 1 The Bishop and diocesan staff
@@ -86,7 +126,15 @@ A list with no numbers at all is read as day 1, day 2, and so on. In shorter mon
 last day also includes the days the month doesn't have (February 28 shows days 28–31),
 so no church is missed. You can turn this off in Settings.
 
-**Trinity (weekly).** Paste names one per line, as `First Last` or `Last, First`. Put a
+**Trinity (weekly).** The quickest way is the parish's member list as a spreadsheet:
+**Lists → Trinity → Paste a list → Choose a file**, and pick the CSV (or paste its
+contents). It reads the *First Name* and *Last Name* columns and, where it's filled in,
+uses the *Preferred Name* instead of the first name. Leave **Spread A–Z** chosen with
+Monday to Friday, and everyone is put in last-name order and divided into five even
+lists, with people who share a last name on the same day. Each weekday's names then come
+up on Today, to read at Morning Prayer and check off one by one (or all at once).
+
+You can also paste names one per line, as `First Last` or `Last, First`. Put a
 day name on its own line to start that day's names:
 
 ```
@@ -97,9 +145,9 @@ Monday
 Smith, Tom
 ```
 
-You can also paste the whole directory and choose **Spread over the week**. This puts
-everyone in last-name order, gives each day an even share of the alphabet, keeps
-families with the same last name together, and lets you leave out days such as Sunday.
+**Spread over the week** on the list's page does the same for names already there. It
+uses the days you chose last time (Monday to Friday unless you change them), gives each
+day an even share of the alphabet, and keeps families with the same last name together.
 When you add someone new, the app suggests the day where their last name falls.
 Sorting understands couples ("John & Mary Smith"), "The Smith Family", titles, suffixes
 ("Jr."), and surnames like "de la Cruz".
@@ -111,8 +159,9 @@ GitHub Pages is the simplest:
 
 1. GitHub Pages is free for **public** repositories. This repository is private, so
    either make it public (**Settings → General → Danger Zone → Change visibility**) or
-   use a paid GitHub plan. Making it public exposes only the code: your names and prayer
-   requests are never stored in this repository.
+   use a paid GitHub plan. Making it public exposes only the code and the published
+   cycles built into it (the Anglican Cycle, and the diocese's churches and clergy): your
+   own names, prayer requests and parish list are never stored in this repository.
 2. Go to **Settings → Pages**. Under **Build and deployment**, choose **Deploy from a
    branch**, then pick `main` and `/ (root)`, and save.
 3. After a minute or two the app is at **https://theodramatist.github.io/Prayer-Tracker/**.
@@ -146,7 +195,9 @@ repository you own (keep it separate from this one, which may be public):
 Each device keeps working offline. When it syncs (on opening, every few minutes, and
 shortly after a change), it merges its copy with the file: the newest change to each
 entry wins, deletions are respected, and check-offs made on any device count
-everywhere. The token stays on the device and is never put in backups or in the
+everywhere. Each device fills in the diocese's cycles on its first run, with the same
+entries, so a second device adds no duplicates, and a church you deleted stays deleted
+however much later a new device joins. The token stays on the device and is never put in backups or in the
 synced file. The app refuses a public repository.
 
 ## Your data and backups
@@ -163,7 +214,7 @@ Requires Node 20+ and no dependencies.
 
 ```
 npm start           # serve the app at http://localhost:8080
-npm test            # unit tests: dates, names, cycles, carry-forward, church calendar, importers, storage, sync, PWA files
+npm test            # unit tests: dates, names, cycles, carry-forward, church calendar, importers, storage, the diocese's cycles, sync, PWA files
 npm run test:e2e    # drives the app in Chromium with Playwright; screenshots in tests/e2e/output/
 npm run icons       # re-render the PNG icons from the SVG artwork
 ```
@@ -174,7 +225,8 @@ Layout: `index.html`, `css/app.css`, and ES modules in `js/`:
 - `calendar.js` holds the BCP 1979 calendar (feasts, named Sundays, Propers, transfers);
   `liturgy.js` works out seasons and Easter.
 - `prayers.js` holds the Prayer Book prayers; `bundles.js` and `data/acp.js` hold the
-  built-in cycle.
+  built-in Anglican Cycle; `seeds.js` and `data/diocese.js` hold the diocese's cycles,
+  which are copied into their lists on first run (`scripts/build-diocese.mjs` builds them).
 - `importer.js` reads pasted text and `pdf.js` reads PDFs; `names.js` handles
   last-name sorting.
 - `store.js` handles storage, with per-entry timestamps and tombstones; `sync.js`

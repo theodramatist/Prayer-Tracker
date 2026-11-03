@@ -3,7 +3,7 @@
 // copy with the file (newest change wins, item by item) and writes the result
 // back. The access token stays on the device and never goes in backups.
 
-import { SCHEMA, migrate, syncDocument } from './store.js';
+import { SCHEMA, migrate, syncDocument, keepTombstone } from './store.js';
 import { addDays, todayKey } from './dates.js';
 
 const CONFIG_KEY = 'prayer-tracker:sync';
@@ -15,10 +15,25 @@ const TOMBSTONE_DAYS = 180;
 const byCreated = (x, y) => (x.created || 0) - (y.created || 0) || (x.id < y.id ? -1 : x.id > y.id ? 1 : 0);
 
 /**
+ * The copy changed last. Two copies changed at the same moment (such as a
+ * built-in cycle each device copied in itself) are told apart by their
+ * contents, so every device picks the same one and the merge comes out the
+ * same whichever way round it is done.
+ */
+function newer(x, y, content = canonical) {
+  if (!x || !y) return x || y;
+  if (at(x) !== at(y)) return at(x) > at(y) ? x : y;
+  return content(y) < content(x) ? y : x;
+}
+
+const listContent = (l) => canonical({ ...l, items: undefined, overrides: undefined });
+
+/**
  * Merge two sync documents. Lists, items and edits to built-in entries keep
  * whichever copy changed last; a deletion wins over anything older; each
  * check-off keeps its latest state; list order and settings come from
- * whichever device changed them last.
+ * whichever device changed them last. mergeStates(a, b) and mergeStates(b, a)
+ * give the same result.
  */
 export function mergeStates(a, b, { now = Date.now() } = {}) {
   const tombstones = { ...(a.tombstones || {}) };
@@ -30,17 +45,14 @@ export function mergeStates(a, b, { now = Date.now() } = {}) {
   for (const id of new Set([...aLists.keys(), ...bLists.keys()])) {
     const la = aLists.get(id);
     const lb = bLists.get(id);
-    const newest = !la ? lb : !lb ? la : at(lb) > at(la) ? lb : la;
+    const newest = newer(la, lb, listContent);
     if (tombstones[id] && tombstones[id] >= at(newest)) continue;
 
     const items = new Map();
-    for (const it of [...(la?.items || []), ...(lb?.items || [])]) {
-      const prev = items.get(it.id);
-      if (!prev || at(it) > at(prev)) items.set(it.id, it);
-    }
+    for (const it of [...(la?.items || []), ...(lb?.items || [])]) items.set(it.id, newer(items.get(it.id), it));
     const overrides = {};
     for (const src of [la?.overrides, lb?.overrides]) {
-      for (const [k, o] of Object.entries(src || {})) if (!overrides[k] || at(o) > at(overrides[k])) overrides[k] = o;
+      for (const [k, o] of Object.entries(src || {})) overrides[k] = newer(overrides[k], o);
     }
     const merged = {
       ...newest,
@@ -51,18 +63,28 @@ export function mergeStates(a, b, { now = Date.now() } = {}) {
     lists.push(merged);
   }
 
-  const first = (b.orderUpdated || 0) > (a.orderUpdated || 0) ? b : a;
-  const second = first === a ? b : a;
-  const pos = new Map(first.lists.map((l, i) => [l.id, i]));
-  const pos2 = new Map(second.lists.map((l, i) => [l.id, i]));
-  const rank = (l) => (pos.has(l.id) ? pos.get(l.id) : 10000 + (pos2.get(l.id) ?? 0));
-  lists.sort((x, y) => rank(x) - rank(y));
+  // The order of whichever copy was reordered last. A list only the other copy
+  // has goes after the list it follows there.
+  const idsA = a.lists.map((l) => l.id);
+  const idsB = b.lists.map((l) => l.id);
+  const first = newer({ updated: a.orderUpdated, ids: idsA }, { updated: b.orderUpdated, ids: idsB }, (o) => JSON.stringify(o.ids));
+  const second = first.ids === idsA ? idsB : idsA;
+  const order = [...first.ids];
+  for (const [i, id] of second.entries()) {
+    if (order.includes(id)) continue;
+    const before = second.slice(0, i).reverse().find((x) => order.includes(x));
+    order.splice(before ? order.indexOf(before) + 1 : 0, 0, id);
+  }
+  lists.sort((x, y) => order.indexOf(x.id) - order.indexOf(y.id));
 
   const checks = {};
   for (const src of [a.checks, b.checks]) {
     for (const [date, m] of Object.entries(src || {})) {
       const out = (checks[date] ||= {});
-      for (const [id, v] of Object.entries(m)) if (!(id in out) || Math.abs(v) > Math.abs(out[id])) out[id] = v;
+      for (const [id, v] of Object.entries(m)) {
+        const prev = out[id];
+        if (prev === undefined || Math.abs(v) > Math.abs(prev) || (Math.abs(v) === Math.abs(prev) && v > prev)) out[id] = v;
+      }
     }
   }
 
@@ -70,14 +92,14 @@ export function mergeStates(a, b, { now = Date.now() } = {}) {
   const cutoff = addDays(todayKey(new Date(now)), -CHECK_DAYS);
   for (const date of Object.keys(checks)) if (date < cutoff) delete checks[date];
   const keptTombstones = {};
-  for (const [id, t] of Object.entries(tombstones)) if (t >= now - TOMBSTONE_DAYS * 864e5) keptTombstones[id] = t;
+  for (const [id, t] of Object.entries(tombstones)) if (t >= now - TOMBSTONE_DAYS * 864e5 || keepTombstone(id)) keptTombstones[id] = t;
 
   return {
     schema: SCHEMA,
     lists,
     checks,
     tombstones: keptTombstones,
-    settings: at(b.settings) > at(a.settings) ? b.settings : a.settings,
+    settings: newer(a.settings, b.settings) || {},
     orderUpdated: Math.max(a.orderUpdated || 0, b.orderUpdated || 0),
   };
 }

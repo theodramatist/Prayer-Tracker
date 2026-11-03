@@ -5,6 +5,7 @@ import { h, icon, replace, openSheet, confirmSheet, toast, chipGroup, toggle, au
 import { DURATIONS, endDateFor, sortItems, nameOf, planSpread, LIST_TYPES, SORTS, cycleSource } from './schedule.js';
 import { PRAYERS, SOURCE as PRAYER_SOURCE, prayerFor } from './prayers.js';
 import { bundleFor } from './bundles.js';
+import { seedFor } from './seeds.js';
 import { parseList, parseWeekly, parseMonthly, parseDated } from './importer.js';
 import { parseName, compareNames } from './names.js';
 import { WEEKDAYS, WEEKDAYS_SHORT, addDays, diffDays, formatShort, formatMedium, formatWithYear, weekday, parseKey, isValidKey, todayKey } from './dates.js';
@@ -14,6 +15,71 @@ import { isPdf, pdfToText } from './pdf.js';
 export const ACP_URL = 'https://www.anglicancommunion.org/prayer';
 
 const field = (label, ...children) => h('div', { class: 'field' }, label && h('span', { class: 'field-label' }, label), children);
+
+/** Days a weekly list is spread over: the ones used last time, or Monday to Friday. */
+export const spreadDaysFor = (list) => (Array.isArray(list.spreadDays) && list.spreadDays.length ? [...list.spreadDays] : [1, 2, 3, 4, 5]);
+
+/** Weekday chips that can each be turned on or off (at least one stays on). */
+function dayChips(days, onChange) {
+  let current = [...days];
+  return h('div', { class: 'chips chips-wrap chips-spread', role: 'group', 'aria-label': 'Days to use' },
+    WEEKDAYS_SHORT.map((d, i) => {
+      const on = current.includes(i);
+      const b = h('button', {
+        type: 'button',
+        class: `chip ${on ? 'on' : ''}`,
+        'aria-pressed': String(on),
+        onclick: () => {
+          const was = current.includes(i);
+          if (was && current.length === 1) return;
+          current = was ? current.filter((x) => x !== i) : [...current, i].sort();
+          b.classList.toggle('on', !was);
+          b.setAttribute('aria-pressed', String(!was));
+          onChange(current);
+        },
+      }, d);
+      return b;
+    }));
+}
+
+/** One line per day: who falls on it ("Adams – Cole, 40 names"). */
+function spreadPreview(plan) {
+  return plan.map(({ day, items }) => {
+    const first = items[0] && nameOf(items[0]).last;
+    const last = items.length > 1 && nameOf(items[items.length - 1]).last;
+    return h('li', null,
+      h('span', { class: 'preview-key' }, WEEKDAYS[day]),
+      h('span', { class: 'preview-text' }, first ? `${first}${last && last !== first ? ` – ${last}` : ''}` : '—',
+        h('span', { class: 'preview-note' }, plural(items.length, 'name'))));
+  });
+}
+
+/**
+ * Fill a list from the built-in cycle it came with (such as the diocese's),
+ * in place of whatever it has now. Asks first if that would replace entries.
+ */
+export async function loadSeed(app, listId, { onDone } = {}) {
+  const { store } = app;
+  const list = store.list(listId);
+  const found = seedFor(listId);
+  if (!list || !found) return false;
+  const { seed, part } = found;
+  if (list.items.length) {
+    const ok = await confirmSheet({
+      title: `Replace ${list.name}?`,
+      message: `Its ${plural(list.items.length, 'entry', 'entries')} are replaced by the ${plural(part.entries.length, 'entry', 'entries')} in ${part.label}, including any changes you made to them.`,
+      confirm: 'Replace',
+      danger: true,
+    });
+    if (!ok) return false;
+  }
+  const snap = store.snapshot();
+  const n = store.reloadSeed(seed, listId);
+  if (list.hidden) store.updateList(listId, { hidden: false });
+  onDone?.();
+  toast(`${list.name}: ${plural(n, 'entry', 'entries')} from ${part.label}`, { action: 'Undo', onAction: () => store.restore(snap) });
+  return true;
+}
 
 function requestPersistentStorage() {
   try { navigator.storage?.persist?.(); } catch { /* not supported */ }
@@ -434,9 +500,9 @@ function openEntrySheet(app, list, entry) {
 
 const IMPORT_HELP = {
   daily: 'One per line. Bullets and numbers are removed.',
-  weekly: 'One name per line, as First Last or Last, First. To set the days, put a day name on its own line (Sunday, Monday…) above that day’s names.',
+  weekly: 'One name per line, as First Last or Last, First. To set the days, put a day name on its own line (Sunday, Monday…) above that day’s names. A spreadsheet (CSV) with First Name and Last Name columns works too; a Preferred Name column is used where it’s filled in.',
   monthly: 'One church per line. Start a line with its day number (“2 St Paul’s, Anytown”); lines without a number belong to the day above. With no numbers, line 1 is day 1, line 2 is day 2, and so on.',
-  dated: 'Each day’s entry should start with its date, such as “Monday 2 November 2026”, “Nov 2, 2026” or “2026-11-02”. The lines after a date, up to the next date, are that day’s entry.',
+  dated: 'Each day’s entry should start with its date, such as “Monday 2 November 2026”, “Nov 2, 2026” or “2026-11-02”. The lines after a date, up to the next date, are that day’s entry. A calendar laid out by month works too, like the diocese’s Daily Cycle of Prayer PDF: a month name on its own line, then each day’s number and name (“3 Scott Seefeldt, Rector, Zion, Oconomowoc”).',
   cycle: 'Each day’s entry should start with its date, such as “Monday 2 November 2026”, “02-Nov-2026” or “2026-11-02”; the lines after it, up to the next date, are that day’s entry. After the last date the cycle starts over.',
 };
 
@@ -460,6 +526,7 @@ export function openImportSheet(app, listId) {
   if (nonEmpty && list.type === 'dated') mode = 'merge';
   if (isCycle) mode = 'cycle';
   let looseDay = list.type === 'weekly' ? (nonEmpty ? suggestWeekday(list, '', app.viewDate) : 'spread') : null;
+  let spreadDays = spreadDaysFor(list);
   let parsed = { entries: [] };
 
   const textarea = h('textarea', {
@@ -530,10 +597,11 @@ export function openImportSheet(app, listId) {
     if (looseDay === 'spread' && parsed.sawHeader) looseDay = 0;
     replace(looseField, field(
       parsed.sawHeader ? `${plural(loose, 'name')} before the first day name go on` : 'Which day?',
-      chipGroup({ label: 'Day for these names', wrap: true, value: looseDay, options, onChange: (v) => { looseDay = v; renderPreview(); } }),
+      chipGroup({ label: 'Day for these names', wrap: true, value: looseDay, options, onChange: (v) => { looseDay = v; renderLoose(); renderPreview(); } }),
       looseDay === 'spread' && h('p', { class: 'hint' }, nonEmpty
-        ? 'Everyone on the list, old and new, is put in last-name order and divided evenly over the week.'
-        : 'Names are put in last-name order and divided evenly over the week.'),
+        ? 'Everyone on the list, old and new, is put in last-name order and divided evenly over these days, keeping families together:'
+        : 'Names are put in last-name order and divided evenly over these days, keeping families together:'),
+      looseDay === 'spread' && dayChips(spreadDays, (days) => { spreadDays = days; renderPreview(); }),
     ));
   }
 
@@ -554,12 +622,19 @@ export function openImportSheet(app, listId) {
       const dayCount = new Set(es.map((e) => e.day).filter((d) => d != null)).size;
       summary = `${plural(es.length, 'name')}${dayCount ? ` over ${plural(dayCount, 'day')}` : ''}`;
     } else summary = plural(es.length, 'entry', 'entries');
+    const warn = parsed.overflow ? h('p', { class: 'hint' }, `${plural(parsed.overflow, 'line')} skipped (titles before day 1, or past day 31).`) : null;
+    if (list.type === 'weekly' && looseDay === 'spread' && es.some((e) => e.day == null)) {
+      const everyone = [...list.items, ...es.map((e, k) => ({ id: `new${k}`, ...e }))];
+      replace(preview,
+        h('p', { class: 'preview-summary' }, icon('check'), `${summary}, spread over ${plural(spreadDays.length, 'day')}`),
+        h('ol', { class: 'spread-preview' }, spreadPreview(planSpread(everyone, spreadDays))));
+      return;
+    }
     const rows = es.slice(0, 6).map((e) => h('li', null,
       h('span', { class: 'preview-key' }, previewKey(e)),
       h('span', { class: 'preview-text' }, list.sort === 'last' ? parseName(e.text).display : e.text,
         e.note && h('span', { class: 'preview-note' }, e.note.split('\n')[0]))));
-    const warn = parsed.overflow ? h('p', { class: 'hint' }, `${plural(parsed.overflow, 'line')} skipped (titles before day 1, or past day 31).`) : null;
-    replace(preview, 
+    replace(preview,
       h('p', { class: 'preview-summary' }, icon('check'), summary),
       h('ul', { class: 'preview-list' }, rows),
       es.length > 6 && h('p', { class: 'hint' }, `…and ${es.length - 6} more`),
@@ -642,7 +717,7 @@ export function openImportSheet(app, listId) {
     } else {
       store.addItems(list.id, entries);
     }
-    if (list.type === 'weekly' && looseDay === 'spread' && es.some((en) => en.day == null)) store.distributeWeekly(list.id);
+    if (list.type === 'weekly' && looseDay === 'spread' && es.some((en) => en.day == null)) store.distributeWeekly(list.id, spreadDays);
     if (list.hidden) store.updateList(list.id, { hidden: false });
     requestPersistentStorage();
     sheet.close();
@@ -707,6 +782,12 @@ export function openListSheet(app, listId = null) {
         toast('Back to the built-in cycle', { action: 'Undo', onAction: () => store.restore(snap) });
       },
     }, 'Switch back to the built-in cycle');
+  const seeded = existing && seedFor(existing.id);
+  const seedBack = seeded && existing.type === seeded.part.list.type && h('button', {
+    class: 'link-btn',
+    type: 'button',
+    onclick: () => loadSeed(app, existing.id, { onDone: () => sheet.close() }),
+  }, existing.items.length ? `Start again from ${seeded.part.label}` : `Fill it from ${seeded.part.label}`);
 
   const form = h('form', { class: 'list-form', novalidate: true },
     field('Name', name),
@@ -721,6 +802,7 @@ export function openListSheet(app, listId = null) {
     existing && toggle({ label: 'Show on Today', checked: !hidden, onChange: (v) => { hidden = !v; } }),
     prayer?.el,
     builtinBack,
+    seedBack,
     h('div', { class: `sheet-actions ${existing ? 'sheet-actions-split' : ''}` }, del, save));
 
   let sheet;
@@ -810,43 +892,15 @@ export function openDistributeSheet(app, listId) {
   const { store } = app;
   const list = store.list(listId);
   if (!list) return null;
-  let days = [0, 1, 2, 3, 4, 5, 6];
+  let days = spreadDaysFor(list);
   const preview = h('ol', { class: 'spread-preview' });
-
-  const renderPreview = () => {
-    const rows = planSpread(list.items, days).map(({ day, items }) => {
-      const first = items[0] && nameOf(items[0]).last;
-      const last = items.length > 1 && nameOf(items[items.length - 1]).last;
-      return h('li', null,
-        h('span', { class: 'preview-key' }, WEEKDAYS[day]),
-        h('span', { class: 'preview-text' }, first ? `${first}${last ? ` – ${last}` : ''}` : '—',
-          h('span', { class: 'preview-note' }, plural(items.length, 'name'))));
-    });
-    replace(preview, rows);
-  };
-
-  const dayChips = h('div', { class: 'chips chips-wrap', role: 'group', 'aria-label': 'Days to use' },
-    WEEKDAYS_SHORT.map((d, i) => {
-      const b = h('button', {
-        type: 'button',
-        class: 'chip on',
-        'aria-pressed': 'true',
-        onclick: () => {
-          const on = days.includes(i);
-          if (on && days.length === 1) return;
-          days = on ? days.filter((x) => x !== i) : [...days, i].sort();
-          b.classList.toggle('on', !on);
-          b.setAttribute('aria-pressed', String(!on));
-          renderPreview();
-        },
-      }, d);
-      return b;
-    }));
+  const renderPreview = () => replace(preview, spreadPreview(planSpread(list.items, days)));
+  const chips = dayChips(days, (d) => { days = d; renderPreview(); });
 
   const submit = h('button', { class: 'btn btn-primary btn-block', type: 'submit' }, `Spread ${plural(list.items.length, 'name')}`);
   const form = h('form', { novalidate: true },
     h('p', { class: 'sheet-text' }, 'Puts everyone in last-name order and divides them evenly, so each day has its own stretch of the alphabet. People who share a last name stay on the same day.'),
-    field('Use these days', dayChips),
+    field('Use these days', chips),
     preview,
     h('div', { class: 'sheet-actions' }, submit));
 
@@ -856,7 +910,7 @@ export function openDistributeSheet(app, listId) {
     const snap = store.snapshot();
     store.distributeWeekly(list.id, days);
     sheet.close();
-    toast('Spread over the week', { action: 'Undo', onAction: () => store.restore(snap) });
+    toast(`Spread over ${plural(days.length, 'day')}`, { action: 'Undo', onAction: () => store.restore(snap) });
   });
 
   renderPreview();

@@ -5,7 +5,8 @@ import { h, icon, toast, plural } from './ui.js';
 import { LIST_TYPES, SORTS, sortItems, partitionByStatus, endLabel, datedRange, cycleSource, itemsDue, builtinEntries } from './schedule.js';
 import { WEEKDAYS, MONTHS, addDays, formatMedium, formatWithYear, formatShort, parseKey } from './dates.js';
 import { editionById } from './bundles.js';
-import { openAddSheet, openItemSheet, openImportSheet, openListSheet, openDistributeSheet, ACP_URL } from './sheets.js';
+import { openAddSheet, openItemSheet, openImportSheet, openListSheet, openDistributeSheet, loadSeed, ACP_URL } from './sheets.js';
+import { seedFor } from './seeds.js';
 
 function summary(list, today) {
   const n = list.items.length;
@@ -252,7 +253,10 @@ function emptyState(app, list) {
     dated: 'Nothing yet. Paste in entries that each start with their date.',
     cycle: 'Nothing yet. Choose Add the cycle and pick its PDF, or paste its text: each day’s entry starting with its date.',
   }[list.type];
-  return h('div', { class: 'empty-card' }, h('p', null, copy));
+  const seeded = seedFor(list.id);
+  return h('div', { class: 'empty-card' }, h('p', null, copy),
+    seeded && seeded.part.list.type === list.type && h('button', { class: 'btn btn-sm btn-primary', type: 'button', onclick: () => loadSeed(app, list.id) },
+      icon('check'), `Use ${seeded.part.label}`));
 }
 
 function filterRows(query) {

@@ -55,6 +55,7 @@ export const SOURCE = 'The Book of Common Prayer';
 export const DEFAULT_PRAYER = {
   anglican: 'church',
   diocese: 'diocese',
+  'diocese-daily': 'clergy',
   trinity: 'parish',
   requests: 'conditions',
   family: 'loved',

@@ -282,7 +282,15 @@ export function planSpread(items, days = [0, 1, 2, 3, 4, 5, 6]) {
   let start = 0;
   for (let k = 0; k < days.length; k++) {
     let end = k === days.length - 1 ? n : start + Math.round((n - start) / (days.length - k));
-    while (end > start && end < n && lastOf(end) === lastOf(end - 1)) end++;
+    if (end > start && end < n && lastOf(end) === lastOf(end - 1)) {
+      // The share ends inside a family: give the family to whichever day
+      // leaves the share closer to even.
+      let before = end;
+      while (before > start && lastOf(before - 1) === lastOf(end)) before--;
+      let after = end;
+      while (after < n && lastOf(after) === lastOf(end - 1)) after++;
+      end = before > start && end - before <= after - end ? before : after;
+    }
     plan.push({ day: days[k], items: sorted.slice(start, end) });
     start = end;
   }

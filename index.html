@@ -6,7 +6,7 @@
   <title>Prayer Tracker</title>
   <meta name="description" content="Daily intercessions: the Anglican Cycle of Prayer, your diocesan and parish cycles, and your own prayer list.">
   <meta name="color-scheme" content="light dark">
-  <meta name="theme-color" content="#f7f4ee">
+  <meta name="theme-color" content="#f6f0e8">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
   <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
@@ -16,12 +16,13 @@
   <meta name="apple-mobile-web-app-title" content="Prayers">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <script>
-    // Set the theme and season colour before the first paint.
+    // Set the theme and colours before the first paint.
     (function () {
       var ui = {};
       try { ui = JSON.parse(localStorage.getItem('prayer-tracker:ui') || '{}'); } catch (e) {}
       var root = document.documentElement;
       root.dataset.theme = ui.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      root.dataset.palette = ui.palette || 'burgundy';
       root.dataset.season = ui.season || 'green';
     })();
   </script>

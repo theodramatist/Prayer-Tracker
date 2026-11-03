@@ -19,7 +19,9 @@ const stripBullet = (l) => l.replace(BULLET_RE, '').trim();
 
 /**
  * One entry per line. If the first line is a spreadsheet header with
- * "First" and "Last" columns (tab- or comma-separated), rows are read by column.
+ * "First" and "Last" columns (tab- or comma-separated), rows are read by
+ * column, and a "Preferred Name" column, where filled in, is used as the
+ * first name.
  * @returns {Array<{text: string, first?: string, last?: string}>}
  */
 export function parseList(text) {
@@ -31,17 +33,36 @@ export function parseList(text) {
   return cleanLines(text).map(stripBullet).filter(Boolean).map((t) => ({ text: t }));
 }
 
+/** One row of a spreadsheet export, allowing for "quoted, cells". */
+function splitRow(row, delim) {
+  if (!row.includes('"')) return row.split(delim).map((c) => c.trim());
+  const cells = [];
+  let cell = '';
+  let quoted = false;
+  for (let i = 0; i < row.length; i++) {
+    const ch = row[i];
+    if (quoted) {
+      if (ch !== '"') cell += ch;
+      else if (row[i + 1] === '"') { cell += '"'; i++; } else quoted = false;
+    } else if (ch === '"') quoted = true;
+    else if (ch === delim) { cells.push(cell.trim()); cell = ''; } else cell += ch;
+  }
+  cells.push(cell.trim());
+  return cells;
+}
+
 function readNameTable(rows) {
   const delim = rows[0].includes('\t') ? '\t' : rows[0].includes(',') ? ',' : null;
   if (!delim) return null;
-  const header = rows[0].split(delim).map((c) => c.trim().toLowerCase());
+  const header = splitRow(rows[0], delim).map((c) => c.toLowerCase());
   const fi = header.findIndex((c) => /^first( name)?$|^given/.test(c));
   const li = header.findIndex((c) => /^last( name)?$|^surname|^family name/.test(c));
+  const pi = header.findIndex((c) => /^(preferred|nick ?name|known as|goes by)/.test(c));
   if (fi < 0 || li < 0) return null;
   const out = [];
   for (const row of rows.slice(1)) {
-    const cells = row.split(delim).map((c) => c.trim().replace(/^"|"$/g, ''));
-    const first = cells[fi] || '';
+    const cells = splitRow(row, delim);
+    const first = (pi >= 0 && cells[pi]) || cells[fi] || '';
     const last = cells[li] || '';
     if (!first && !last) continue;
     out.push({ text: [first, last].filter(Boolean).join(' '), first, last });
@@ -237,6 +258,7 @@ export function parseDated(text, { defaultYear = new Date().getFullYear() } = {}
   if (json) return summarize(json);
 
   const lines = cleanLines(text, ' — ');
+  if (isDayCalendar(lines)) return summarize(parseDayCalendar(lines, defaultYear));
   const isNoise = noiseFilter(lines);
   const entries = [];
   let year = defaultYear;
@@ -284,6 +306,118 @@ export function parseDated(text, { defaultYear = new Date().getFullYear() } = {}
   }
   finish();
   return summarize(entries);
+}
+
+// ---------- day-numbered calendars (a diocesan daily cycle) ----------
+// JANUARY
+// 1 William Forrest, OSB, CR Priest
+// 3 Scott Seefeldt, Rector Zion,
+// Oconomowoc
+
+const CAL_DAY_RE = /^(\d{1,2})(?:st|nd|rd|th)?[.):]?(?:\s+(.*))?$/;
+
+/** Month headings with day-numbered lines under them, and (almost) no full dates. */
+function isDayCalendar(lines) {
+  let headings = 0;
+  let days = 0;
+  let full = 0;
+  let inMonth = false;
+  for (const l of lines) {
+    if (matchMonthHeading(l)) { headings += 1; inMonth = true; continue; }
+    if (matchDateLine(l)) full += 1;
+    else if (inMonth && CAL_DAY_RE.test(l)) days += 1;
+  }
+  return headings >= 1 && days >= 10 && full < days / 4;
+}
+
+const isCalendarNoise = (l) => /^updated\b/i.test(l) || /\bpage\s*-?\s*\d+\s*-?\s*$/i.test(l) || /^\*/.test(l);
+
+function parseDayCalendar(lines, defaultYear) {
+  let year = defaultYear;
+  // A year in the title ("Daily Cycle of Prayer 2026") is the calendar's year.
+  for (const l of lines) {
+    if (matchMonthHeading(l)) break;
+    const y = l.match(/\b(?:19|20)\d{2}\b/);
+    if (y) { year = Number(y[0]); break; }
+  }
+  const out = [];
+  let month = null;
+  let lastMonth = null;
+  let cur = null;
+  const finish = () => {
+    if (cur && cur.text.trim()) out.push({ date: cur.date, ...splitPersonRole(cur.text) });
+    cur = null;
+  };
+  for (const l of lines) {
+    const h = matchMonthHeading(l);
+    if (h) {
+      finish();
+      if (h.y) year = h.y;
+      else if (lastMonth != null && h.m < lastMonth) year += 1;
+      lastMonth = h.m;
+      month = h.m;
+      continue;
+    }
+    if (isCalendarNoise(l)) continue;
+    const d = month && l.match(CAL_DAY_RE);
+    if (d && +d[1] >= 1 && +d[1] <= daysInMonth(year, month)) {
+      finish();
+      cur = { date: keyFromParts(year, month, +d[1]), text: d[2] || '' };
+      continue;
+    }
+    if (cur) cur.text += ` ${l}`; // a wrapped line
+  }
+  finish();
+  return out;
+}
+
+// Where a clergy listing's role begins: "Rector", "PiC", "Retired Priest", "Deceased Bishop"…
+const ROLE_WORD = /\b(?:Rector|Associate|Assisting|Priest|PiC|Pic|Deacon|Retired|Deceased|Decease|Bishop|Supply|LT|Canon|Dean|Vicar|Interim|Chaplain|President|CR)\b|\(Bishop\)/;
+const POST_NOMINAL = /^(?:I{2,3}|IV|Jr\.?|Sr\.?|OSB|OJN|OBS|PhD|DMin)$/;
+
+/**
+ * "Scott Seefeldt, Rector Zion, Oconomowoc" → { text: 'Scott Seefeldt', note: 'Rector, Zion, Oconomowoc' }.
+ * Groups ("Members of the Standing Committee") are left whole. CR, PiC and
+ * LT Supply are written out, as the diocese's own footnotes define them.
+ */
+export function splitPersonRole(input) {
+  const s = String(input).replace(/\s+/g, ' ').replace(/\s+,/g, ',').trim().replace(/,$/, '');
+  const parts = s.split(/,\s*/);
+  let name;
+  let role;
+  let inFirst = parts[0].search(ROLE_WORD);
+  // "Dean Einerson, PiC …": a first name that happens to be a title.
+  if (inFirst === 0 && parts.length > 1 && /^\S+\s+[A-Z]/.test(parts[0]) && parts[0].slice(1).search(ROLE_WORD) < 0) inFirst = -1;
+  if (inFirst > 0) {
+    name = parts[0].slice(0, inFirst).trim();
+    role = [parts[0].slice(inFirst), ...parts.slice(1)].join(', ');
+  } else if (inFirst === 0 || parts.length === 1) {
+    return { text: s };
+  } else {
+    const nameParts = [parts[0]];
+    let i = 1;
+    while (i < parts.length && POST_NOMINAL.test(parts[i])) nameParts.push(parts[i++]);
+    // "OSB CR Priest": a post-nominal at the front of the role belongs to the name.
+    const lead = (parts[i] || '').match(/^(OSB|OJN|OBS)\s+(.*)$/);
+    if (lead) { nameParts.push(lead[1]); parts[i] = lead[2]; }
+    name = nameParts.join(', ').replace(/, (I{2,3}|IV|Jr\.?|Sr\.?)\b/, ' $1');
+    role = parts.slice(i).join(', ');
+  }
+  if (!name || !role) return { text: s };
+  return { text: name, note: expandRole(role) };
+}
+
+function expandRole(role) {
+  let r = role.replace(/\bDecease\b/, 'Deceased').trim();
+  r = r.replace(/\bLT Supply\b/, 'Long-term supply').replace(/\bPi[Cc]\b/g, 'Priest-in-Charge');
+  // "Rector Zion, …" → "Rector, Zion, …" (but not "Associate Priest" or "Associate Rector")
+  r = r.replace(/^((?:\(Bishop\) )?(?:Rector|Deacon|Priest-in-Charge|Supply|Long-term supply|Associate|Dean|Interim))\s+(?=[A-Z])(?!(?:Priest|Rector)\b)/, '$1, ');
+  // CR (canonically resident) goes right after the role: "Priest CR, Northern Highlands" → "Priest, canonically resident, Northern Highlands".
+  const parts = r.split(/\s*,\s*/).filter(Boolean);
+  const resident = parts.some((x) => /\bCR\b/.test(x));
+  const cleaned = parts.map((x) => x.replace(/\s*\bCR\b\s*/g, ' ').trim()).filter(Boolean);
+  if (resident) cleaned.splice(1, 0, cleaned.length ? 'canonically resident' : 'Canonically resident');
+  return cleaned.join(', ');
 }
 
 function tryJson(text) {

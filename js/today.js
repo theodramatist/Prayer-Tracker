@@ -7,7 +7,8 @@ import { agenda, carriedOver, endLabel, entryCount } from './schedule.js';
 import { formatDate, formatLong, formatMedium, formatWithYear, diffDays } from './dates.js';
 import { dayTitle } from './calendar.js';
 import { prayerFor } from './prayers.js';
-import { openAddSheet, openItemSheet, openImportSheet, ACP_URL } from './sheets.js';
+import { openAddSheet, openItemSheet, openImportSheet, loadSeed, ACP_URL } from './sheets.js';
+import { seedFor } from './seeds.js';
 import { openPrayThrough } from './praythrough.js';
 import { saveBackup } from './settings.js';
 
@@ -124,9 +125,9 @@ function dayHeader(app, date) {
     onchange: (e) => { if (e.target.value) app.setDate(e.target.value); },
   });
   picker.addEventListener('click', () => { try { picker.showPicker?.(); } catch { /* not allowed */ } });
-  const seasonal = app.store.state.settings.seasonalColor !== false;
-  return h('header', { class: 'day-head', 'data-color': seasonal ? day.color : 'none' },
-    seasonal && h('span', { class: 'ribbon', 'aria-hidden': 'true' }),
+  // A ribbon in the liturgical colour of the day, whatever the app's colours.
+  return h('header', { class: 'day-head', 'data-color': day.color },
+    h('span', { class: 'ribbon', 'aria-hidden': 'true' }),
     h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Previous day', onclick: () => app.shiftDay(-1) }, icon('left')),
     h('div', { class: 'day-title' },
       h('p', { class: `day-rel ${isToday ? '' : 'away'}` }, relativeDay(date, app.today)),
@@ -212,8 +213,23 @@ function groupSection(app, g, model) {
       }, complete ? icon('check') : String(pending.length + g.carried.length))),
     !complete && prayerBlock(app, g.list),
     pending.length > 0 && h('ul', { class: 'items' }, pending.map((i) => itemRow(app, g.list, i, false))),
+    pending.length >= 3 && allPrayed(app, pending, model.date),
     g.carried.length > 0 && carriedBlock(app, g),
     app.showDone && done.length > 0 && h('ul', { class: 'items items-done' }, done.map((i) => itemRow(app, g.list, i, true))));
+}
+
+/** For a list read out in one go (say, at Morning Prayer): mark everyone on it at once. */
+function allPrayed(app, items, date) {
+  const pairs = items.map((i) => [date, i.id]);
+  return h('div', { class: 'group-foot' },
+    h('button', {
+      class: 'link-btn',
+      type: 'button',
+      onclick: () => {
+        app.store.setCheckedMany(pairs, true);
+        toast(`Prayed for all ${items.length}`, { action: 'Undo', onAction: () => app.store.setCheckedMany(pairs, false) });
+      },
+    }, icon('check'), `Prayed for all ${items.length}`));
 }
 
 function carriedBlock(app, g) {
@@ -319,11 +335,14 @@ const SETUP = {
 
 function setupCard(app, list) {
   const copy = SETUP[list.type];
+  const seeded = seedFor(list.id);
+  const fromSeed = seeded && seeded.part.list.type === list.type;
   return h('section', { class: 'setup-card', 'data-list': list.id },
     h('h2', null, list.name),
     h('p', null, list.type === 'cycle' && list.kind !== 'acp' ? 'Paste in the cycle: each day’s entry starting with its date.' : copy.text),
     h('div', { class: 'setup-actions' },
-      h('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: () => openImportSheet(app, list.id) }, icon('paste'), copy.paste),
+      fromSeed && h('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: () => loadSeed(app, list.id) }, icon('check'), `Use ${seeded.part.label}`),
+      h('button', { class: `btn btn-sm ${fromSeed ? '' : 'btn-primary'}`, type: 'button', onclick: () => openImportSheet(app, list.id) }, icon('paste'), copy.paste),
       (list.type === 'weekly' || list.type === 'monthly') && h('button', { class: 'btn btn-sm', type: 'button', onclick: () => openAddSheet(app, { listId: list.id }) }, icon('plus'), 'Add one'),
       list.kind === 'acp' && h('a', { class: 'btn btn-sm', href: ACP_URL, target: '_blank', rel: 'noopener' }, icon('link'), 'Get the PDF'),
       h('button', {

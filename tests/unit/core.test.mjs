@@ -176,6 +176,12 @@ test('parseList: bullets and numbering removed; spreadsheet header columns used'
     { text: 'Maria de la Cruz', first: 'Maria', last: 'de la Cruz' },
   ]);
   assert.deepEqual(parseList('first,last\nAnn,Lee').map((e) => e.text), ['Ann Lee']);
+  // A member directory: the preferred name, where there is one, is the first name.
+  const members = parseList('First Name,Preferred Name,Last Name\r\nMargaret,Peggy,Quill\r\nInes,,Vale Moreno\r\n"Anna, Jo",,"O\'Dwyer"\r\n');
+  assert.deepEqual(members.map((e) => [e.text, e.first, e.last]), [
+    ['Peggy Quill', 'Peggy', 'Quill'], ['Ines Vale Moreno', 'Ines', 'Vale Moreno'], ["Anna, Jo O'Dwyer", 'Anna, Jo', "O'Dwyer"],
+  ]);
+  assert.deepEqual(parseWeekly('First Name\tNickname\tLast Name\nRobert\tBob\tSmith').entries, [{ text: 'Bob Smith', first: 'Bob', last: 'Smith', day: null }]);
 });
 
 test('parseWeekly: weekday headers assign days; plain names get null', () => {
@@ -316,4 +322,55 @@ test('clergy go in the details, so they can be changed', () => {
     { day: 2, text: 'St Barnabas, Beta', note: 'Mtr. B. Priest' },
     { day: 2, text: 'St Clement’s, Gamma' },
   ]);
+});
+
+test('day-numbered calendars (a diocesan daily cycle) are read with their year, wrapped lines and roles', () => {
+  const text = `Daily Cycle of Prayer 2026 Updated 1/7/2026
+JANUARY
+1 William Forrest, OSB, CR Priest
+2 Richard Craig, III, Retired Priest
+3 Scott Seefeldt, Rector Zion,
+Oconomowoc
+5 Patrick Twomey, Retired Priest
+6 Brit Frazier, Rector St. Luke’s, Sister
+Bay
+8 Mike Klusmeyer, (Bishop) Interim, St.
+Paul’s Cathedral, Fond du Lac
+9 William Bulson, Rector, Grace,
+Sheboygan
+10 Jackie Broughton, PiC, Grace,
+Menomonie
+12 Don Fleischman, PiC, St. Mark’s,
+Milwaukee
+27 Jeffrey Berard Deacon CR
+FEBRUARY
+15
+16 Members of the Mission Council
+17 Stephen Capitelli, LT Supply, St.
+Peter’s, North Lake
+Updated 1/7/2026 DIOCESAN CALENDAR Page -2-
+18 Cyrus Fredrick Knight Deceased
+Bishop, Historic Diocese of Milwaukee
+(1931-1891)
+19 Aelred Glidden, OSB CR Priest
+*CR=Canonically Resident`;
+  const r = parseDated(text, { defaultYear: 1999 });
+  assert.deepEqual(r.entries, [
+    { date: '2026-01-01', text: 'William Forrest, OSB', note: 'Priest, canonically resident' },
+    { date: '2026-01-02', text: 'Richard Craig III', note: 'Retired Priest' },
+    { date: '2026-01-03', text: 'Scott Seefeldt', note: 'Rector, Zion, Oconomowoc' },
+    { date: '2026-01-05', text: 'Patrick Twomey', note: 'Retired Priest' },
+    { date: '2026-01-06', text: 'Brit Frazier', note: 'Rector, St. Luke’s, Sister Bay' },
+    { date: '2026-01-08', text: 'Mike Klusmeyer', note: '(Bishop) Interim, St. Paul’s Cathedral, Fond du Lac' },
+    { date: '2026-01-09', text: 'William Bulson', note: 'Rector, Grace, Sheboygan' },
+    { date: '2026-01-10', text: 'Jackie Broughton', note: 'Priest-in-Charge, Grace, Menomonie' },
+    { date: '2026-01-12', text: 'Don Fleischman', note: 'Priest-in-Charge, St. Mark’s, Milwaukee' },
+    { date: '2026-01-27', text: 'Jeffrey Berard', note: 'Deacon, canonically resident' },
+    { date: '2026-02-16', text: 'Members of the Mission Council' },
+    { date: '2026-02-17', text: 'Stephen Capitelli', note: 'Long-term supply, St. Peter’s, North Lake' },
+    { date: '2026-02-18', text: 'Cyrus Fredrick Knight', note: 'Deceased Bishop, Historic Diocese of Milwaukee (1931-1891)' },
+    { date: '2026-02-19', text: 'Aelred Glidden, OSB', note: 'Priest, canonically resident' },
+  ]);
+  // The Anglican Cycle's layout (full dates) is not mistaken for this one.
+  assert.equal(parseDated('Monday 2 November 2026\nThe Diocese of Carlisle').entries[0].date, '2026-11-02');
 });

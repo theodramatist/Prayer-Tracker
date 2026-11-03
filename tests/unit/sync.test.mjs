@@ -188,3 +188,47 @@ test('changes on a device schedule a sync', async () => {
   phone.store.setChecked('2026-11-03', 'x', true, { silent: true });
   assert.equal(scheduled, 2);
 });
+
+test('merge comes out the same whichever way round, even for copies saved at the same moment', () => {
+  const a = doc({
+    lists: [list('x', { since: '2026-11-01', updated: 0, items: [item('s1', { since: '2026-11-05', updated: 7 })] }), list('y', { updated: 0 })],
+    checks: { '2026-11-02': { mom: 10 } },
+    settings: { theme: 'dark', updated: 0 },
+  });
+  const b = doc({
+    lists: [list('y', { updated: 0 }), list('x', { since: '2026-11-04', updated: 0, items: [item('s1', { since: '2026-11-02', updated: 7 })] })],
+    checks: { '2026-11-02': { mom: -10 } },
+    settings: { theme: 'light', updated: 0 },
+  });
+  const ab = merge(a, b);
+  assert.equal(canonical(ab), canonical(merge(b, a)));
+  // The earlier copy of a tie wins, and merging again changes nothing.
+  assert.equal(ab.lists.find((l) => l.id === 'x').items[0].since, '2026-11-02');
+  assert.equal(canonical(merge(ab, a)), canonical(ab));
+  assert.equal(canonical(merge(b, ab)), canonical(ab));
+  assert.equal(ab.checks['2026-11-02'].mom, 10);
+});
+
+test('merge: a list only one copy has goes after the list it follows there', () => {
+  const a = doc({ lists: [list('anglican'), list('diocese'), list('trinity'), list('family')], orderUpdated: 9 });
+  const b = doc({ lists: [list('anglican'), list('diocese'), list('diocese-daily'), list('trinity')], orderUpdated: 0 });
+  assert.deepEqual(merge(a, b).lists.map((l) => l.id), ['anglican', 'diocese', 'diocese-daily', 'trinity', 'family']);
+  assert.deepEqual(merge(b, a).lists.map((l) => l.id), ['anglican', 'diocese', 'diocese-daily', 'trinity', 'family']);
+});
+
+test('two devices that each copied in the diocese’s cycles agree, with no duplicates', async () => {
+  const { SEEDS } = await import('../../js/seeds.js');
+  const phone = new Store(memoryStorage(), { clock: () => Date.parse('2026-11-03T14:00:00Z') });
+  phone.seed(SEEDS[0]);
+  phone.updateItem(phone.list('diocese').items[0].id, { note: 'A new priest-in-charge' });
+  phone.deleteItem(phone.list('diocese').items[1].id);
+  const ipad = new Store(memoryStorage(), { clock: () => Date.parse('2027-07-01T14:00:00Z') });
+  ipad.seed(SEEDS[0]);
+  const m = mergeStates(phone.syncDocument(), ipad.syncDocument(), { now: Date.parse('2027-07-01T14:00:00Z') });
+  assert.equal(canonical(m), canonical(mergeStates(ipad.syncDocument(), phone.syncDocument(), { now: Date.parse('2027-07-01T14:00:00Z') })));
+  const monthly = m.lists.find((l) => l.id === 'diocese');
+  assert.equal(monthly.items.length, 104);
+  assert.equal(monthly.items[0].note, 'A new priest-in-charge');
+  assert.equal(m.lists.find((l) => l.id === 'diocese-daily').items.length, 307);
+  assert.ok(Object.keys(m.tombstones).some((id) => id.startsWith('seed-'))); // kept, though older than 180 days
+});

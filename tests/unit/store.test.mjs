@@ -20,7 +20,7 @@ test('first run creates the four cycles and the daily lists', () => {
   const store = new Store(memoryStorage());
   const types = store.state.lists.map((l) => [l.id, l.type]);
   assert.deepEqual(types, [
-    ['anglican', 'cycle'], ['diocese', 'monthly'], ['trinity', 'weekly'],
+    ['anglican', 'cycle'], ['diocese', 'monthly'], ['diocese-daily', 'dated'], ['trinity', 'weekly'],
     ['requests', 'daily'], ['family', 'daily'], ['clergy', 'daily'],
   ]);
   assert.equal(store.list('trinity').sort, 'last');
@@ -35,7 +35,7 @@ test('items persist across reloads; corrupt data is kept aside, not lost', () =>
 
   const bad = memoryStorage({ [STORAGE_KEY]: '{not json' });
   const c = new Store(bad);
-  assert.equal(c.state.lists.length, 6);
+  assert.equal(c.state.lists.length, 7);
   assert.ok(Object.keys(bad.data).some((k) => k.startsWith(`${STORAGE_KEY}:unreadable:`)));
 });
 
@@ -125,15 +125,23 @@ test('distribute a weekly list alphabetically, keeping shared last names togethe
   const names = ['Ann Adams', 'Bob Baker', 'Cy Baker', 'Di Baker', 'Ed Clark', 'Flo Davis', 'Gus Evans',
     'Hal Fox', 'Ivy Green', 'Jo Hill', 'Kim Irwin', 'Lu Jones', 'Mo King', 'Ned Lee'];
   store.addItems('trinity', names.map((text) => ({ text })));
-  store.distributeWeekly('trinity');
+  store.distributeWeekly('trinity', [0, 1, 2, 3, 4, 5, 6]);
   const byDay = Array.from({ length: 7 }, (_, d) => itemsDue(store.list('trinity'), `2026-11-0${d + 1}`).map((i) => i.text));
-  // 2026-11-01 is a Sunday, so index 0 = Sunday.
-  assert.deepEqual(byDay[0], ['Ann Adams', 'Bob Baker', 'Cy Baker', 'Di Baker']);
+  // 2026-11-01 is a Sunday, so index 0 = Sunday. The Bakers stay together, on
+  // whichever side of the cut keeps the days most even.
+  assert.deepEqual(byDay.map((d) => d.length), [1, 3, 2, 2, 2, 2, 2]);
+  assert.deepEqual(byDay[1], ['Bob Baker', 'Cy Baker', 'Di Baker']);
   assert.equal(byDay.flat().length, names.length);
-  for (const day of byDay.slice(1)) assert.ok(day.length >= 1 && day.length <= 2);
 
+  // Left to itself it uses Monday to Friday, and remembers the days chosen.
+  store.distributeWeekly('trinity');
+  assert.deepEqual(store.list('trinity').spreadDays, [1, 2, 3, 4, 5]);
+  const weekdays = Array.from({ length: 7 }, (_, d) => itemsDue(store.list('trinity'), `2026-11-0${d + 1}`).length);
+  assert.deepEqual([weekdays[0], weekdays[6]], [0, 0]);
+  assert.deepEqual(weekdays.slice(1, 6), [4, 3, 2, 3, 2]); // the Bakers stay together on Monday
   store.distributeWeekly('trinity', [1, 2, 3, 4, 5, 6]);
   assert.equal(itemsDue(store.list('trinity'), '2026-11-01').length, 0);
+  assert.deepEqual(store.list('trinity').spreadDays, [1, 2, 3, 4, 5, 6]);
 });
 
 test('lists: add, rename, hide, reorder, delete', () => {
@@ -144,7 +152,7 @@ test('lists: add, rename, hide, reorder, delete', () => {
   store.updateList(list.id, { hidden: false });
   assert.equal('hidden' in store.list(list.id), false);
   store.moveList(list.id, -1);
-  assert.equal(store.state.lists[5].id, list.id);
+  assert.equal(store.state.lists[6].id, list.id);
   store.setMeta('quickAddList', list.id);
   store.deleteList(list.id);
   assert.equal(store.list(list.id), null);
@@ -154,12 +162,12 @@ test('lists: add, rename, hide, reorder, delete', () => {
 test('backup export/import round-trip and validation', () => {
   const a = new Store(memoryStorage());
   a.addItems('family', [{ text: 'Mom' }]);
-  a.setSetting('seasonalColor', false);
+  a.setSetting('palette', 'blue');
   const file = JSON.parse(JSON.stringify(a.exportData()));
   const b = new Store(memoryStorage());
   b.importData(file);
   assert.equal(b.list('family').items[0].text, 'Mom');
-  assert.equal(b.state.settings.seasonalColor, false);
+  assert.equal(b.state.settings.palette, 'blue');
   assert.throws(() => b.importData({ hello: 'world' }));
   assert.equal(b.list('family').items[0].text, 'Mom'); // unchanged after a bad import
   assert.throws(() => migrate(null));
@@ -216,7 +224,7 @@ test('version 1 data is upgraded: the empty Anglican list becomes the built-in c
   assert.equal(m.lists[1].items[0].updated, 5);
   assert.equal(m.lists[1].since, '2026-11-03');
   assert.deepEqual(m.tombstones, {});
-  assert.equal(m.settings.seasonalColor, false);
+  assert.equal(m.settings.palette, 'burgundy'); // the new colours, whatever was chosen before
   assert.equal(m.settings.showPrayers, true);
 });
 
@@ -365,4 +373,99 @@ test('a newer edition takes over from its first day; the newest starts over afte
   } finally {
     BUNDLES.acp.pop();
   }
+});
+
+// ---------- built-in cycles copied into lists (the diocese's) ----------
+
+const SEED = {
+  id: 'test2026',
+  updated: Date.parse('2026-11-03T00:00:00Z'),
+  lists: [
+    { list: { id: 'diocese', name: 'Diocesan Cycle', type: 'monthly' }, label: 'the monthly cycle', entries: [
+      { key: 'm1', day: 1, text: 'St. A’s, Ayton', note: 'Ann Able, Rector' },
+      { key: 'm2', day: 2, text: 'St. B’s, Beeton' },
+    ] },
+    { list: { id: 'diocese-daily', name: 'Diocesan Daily Cycle', type: 'dated' }, after: 'diocese', label: 'the daily cycle', entries: [
+      { key: '2026-11-03', date: '2026-11-03', text: 'Lynn Zobel', note: 'Deacon' },
+    ] },
+  ],
+};
+
+test('first run copies the diocese’s cycles into their lists, once', () => {
+  const store = new Store(memoryStorage(), { clock: () => Date.parse('2026-11-05T15:00:00Z') });
+  assert.equal(store.seed(SEED), 3);
+  assert.deepEqual(store.list('diocese').items.map((i) => [i.id, i.day, i.text, i.note, i.since]), [
+    ['seed-test2026-m1', 1, 'St. A’s, Ayton', 'Ann Able, Rector', '2026-11-05'],
+    ['seed-test2026-m2', 2, 'St. B’s, Beeton', undefined, '2026-11-05'],
+  ]);
+  assert.deepEqual(itemsDue(store.list('diocese-daily'), '2026-11-03').map((i) => i.text), ['Lynn Zobel']);
+  assert.equal(store.seed(SEED), 0); // already done on this device
+  assert.equal(store.list('diocese').items.length, 2);
+  // Nothing from before the copy is carried forward as missed.
+  assert.equal(carriedOver(store.state, '2026-11-05', () => false).get('diocese'), undefined);
+});
+
+test('the copy adds a list that older versions didn’t have, and leaves your own entries and deletions alone', () => {
+  const storage = memoryStorage();
+  const old = new Store(storage);
+  old.commit((s) => { s.lists = s.lists.filter((l) => l.id !== 'diocese-daily'); });
+  old.addItems('diocese', [{ text: 'My own church', day: 4 }]);
+  const store = new Store(storage);
+  store.seed(SEED);
+  assert.deepEqual(store.state.lists.map((l) => l.id).slice(0, 3), ['anglican', 'diocese', 'diocese-daily']);
+  assert.deepEqual(store.list('diocese').items.map((i) => i.text), ['My own church']);
+  assert.equal(store.list('diocese-daily').items.length, 1);
+
+  const fresh = new Store(memoryStorage());
+  fresh.commit((s) => { s.tombstones['seed-test2026-m2'] = 5; s.tombstones['diocese-daily'] = 5; s.lists = s.lists.filter((l) => l.id !== 'diocese-daily'); });
+  fresh.seed(SEED);
+  assert.deepEqual(fresh.list('diocese').items.map((i) => i.key ?? i.id), ['seed-test2026-m1']);
+  assert.equal(fresh.list('diocese-daily'), null);
+});
+
+test('deletions of copied entries are never forgotten, so a new device can’t bring them back', () => {
+  let now = Date.parse('2026-11-05T12:00:00Z');
+  const store = new Store(memoryStorage(), { clock: () => now });
+  store.seed(SEED);
+  store.deleteItem('seed-test2026-m2');
+  const ownId = store.addItems('family', [{ text: 'Mom' }])[0].id;
+  store.deleteItem(ownId);
+  now += 400 * 864e5;
+  store.prune();
+  assert.ok(store.state.tombstones['seed-test2026-m2']);
+  assert.equal(store.state.tombstones[ownId], undefined);
+});
+
+test('starting a list again from the diocese’s cycle replaces it, and wins over older deletions elsewhere', () => {
+  let now = Date.parse('2026-11-05T12:00:00Z');
+  const store = new Store(memoryStorage(), { clock: () => now });
+  store.seed(SEED);
+  store.deleteItem('seed-test2026-m1');
+  store.updateItem('seed-test2026-m2', { note: 'New rector' });
+  store.addItems('diocese', [{ text: 'A new plant', day: 9 }]);
+  now += 864e5;
+  assert.equal(store.reloadSeed(SEED, 'diocese'), 2);
+  const items = store.list('diocese').items;
+  assert.deepEqual(items.map((i) => [i.id, i.note]), [['seed-test2026-m1', 'Ann Able, Rector'], ['seed-test2026-m2', undefined]]);
+  assert.equal(store.state.tombstones['seed-test2026-m1'], undefined);
+  assert.ok(items.every((i) => i.updated > Date.parse('2026-11-05T12:00:00Z')));
+  assert.equal(store.reloadSeed(SEED, 'trinity'), 0);
+});
+
+test('the real diocesan cycles: every church on a day of the month, a name for most dates of 2026', async () => {
+  const { SEEDS } = await import('../../js/seeds.js');
+  const seed = SEEDS[0];
+  const store = new Store(memoryStorage(), { clock: () => Date.parse('2026-11-03T14:00:00Z') });
+  store.seed(seed);
+  const monthly = store.list('diocese');
+  assert.equal(monthly.items.length, 105);
+  for (let d = 1; d <= 31; d++) assert.ok(itemsDue(monthly, `2026-12-${String(d).padStart(2, '0')}`).length >= 2, `day ${d}`);
+  const churches = monthly.items.filter((i) => i.day <= 28);
+  assert.equal(churches.length, 97);
+  assert.equal(new Set(churches.map((i) => i.text)).size, 97);
+  assert.deepEqual(itemsDue(monthly, '2026-11-03').map((i) => i.text), ['Christ Church, Delavan', 'St. James, West Bend', 'St. Anskar’s, Hartland', 'St. Aiden’s, Hartford']);
+  const daily = store.list('diocese-daily');
+  assert.equal(daily.items.length, 307);
+  assert.deepEqual(itemsDue(daily, '2026-11-03').map((i) => [i.text, i.note]), [['Lynn Zobel', 'Deacon, St. Michael’s, Racine']]);
+  assert.equal(new Set(daily.items.map((i) => i.id)).size, 307);
 });

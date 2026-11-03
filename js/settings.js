@@ -2,8 +2,9 @@
 
 import { h, icon, toast, toggle, chipGroup, confirmSheet } from './ui.js';
 import { todayKey, formatWithYear } from './dates.js';
-import { season } from './liturgy.js';
+import { dayTitle } from './calendar.js';
 import { VERSION } from './version.js';
+import { SEEDS } from './seeds.js';
 
 const field = (label, ...children) => h('div', { class: 'field' }, h('span', { class: 'field-label' }, label), children);
 const card = (title, ...children) => h('section', { class: 'settings-card' }, h('h2', null, title), children);
@@ -170,12 +171,14 @@ export function renderSettings(app) {
     h('h1', { class: 'page-title' }, 'Settings'),
 
     card('Appearance',
-      toggle({
-        label: 'Colours of the church year',
-        hint: `The accent colour follows the liturgical season. Now: ${season(app.today).name}.`,
-        checked: s.seasonalColor,
-        onChange: (v) => store.setSetting('seasonalColor', v),
-      }),
+      field('Colour', chipGroup({
+        label: 'Colour',
+        className: 'chips-palette',
+        value: s.palette || 'burgundy',
+        options: [{ value: 'burgundy', label: 'Burgundy' }, { value: 'blue', label: 'Blue' }, { value: 'season', label: 'Church year' }],
+        onChange: (v) => store.setSetting('palette', v),
+      })),
+      h('p', { class: 'hint' }, `Church year colours the app by the liturgical day: now ${dayTitle(app.today).color}, ${dayTitle(app.today).title}. The ribbon on Today always shows the day’s colour.`),
       field('Theme', chipGroup({
         label: 'Theme',
         value: s.theme,
@@ -230,6 +233,7 @@ export function renderSettings(app) {
           app.sync?.disconnect();
           const snap = store.snapshot();
           store.eraseAll();
+          for (const seed of SEEDS) store.seed(seed); // as on a first run
           toast('Erased', { action: 'Undo', onAction: () => store.restore(snap) });
         },
       }, icon('trash'), 'Erase all data')),

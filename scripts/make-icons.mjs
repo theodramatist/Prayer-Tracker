@@ -1,4 +1,4 @@
-// Draws the app icon (a lit votive candle) and renders the PNG sizes the
+// Draws the app icon (a lit votive candle on burgundy) and renders the PNG sizes the
 // manifest and iOS need: `npm run icons`.
 import { createRequire } from 'node:module';
 import { writeFile, mkdir } from 'node:fs/promises';
@@ -12,8 +12,8 @@ function art({ rounded }) {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#31477a"/>
-      <stop offset="1" stop-color="#1b2647"/>
+      <stop offset="0" stop-color="#8e2a39"/>
+      <stop offset="1" stop-color="#4f1420"/>
     </linearGradient>
     <radialGradient id="glow" cx="256" cy="190" r="170" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#ffd977" stop-opacity=".55"/>

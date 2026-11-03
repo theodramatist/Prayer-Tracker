@@ -21,7 +21,32 @@ export function uid() {
   return Array.from(bytes, (b) => (b % 36).toString(36)).join('');
 }
 
+function seedItem(seed, entry, k, today) {
+  const item = {
+    id: `${SEED_PREFIX}${seed.id}-${entry.key}`,
+    text: entry.text,
+    created: seed.updated + k,
+    updated: seed.updated,
+    since: today,
+  };
+  if (entry.note) item.note = entry.note;
+  if (entry.day != null) item.day = entry.day;
+  if (entry.date) item.date = entry.date;
+  return item;
+}
+
 export const LIST_TYPES = new Set(['daily', 'weekly', 'monthly', 'dated', 'cycle']);
+
+/** Entries copied in from a built-in cycle (see seeds.js) have ids starting with this. */
+export const SEED_PREFIX = 'seed-';
+const DEFAULT_LIST_IDS = new Set(['anglican', 'diocese', 'diocese-daily', 'trinity', 'requests', 'family', 'clergy']);
+
+/**
+ * Tombstones that are never forgotten: for built-in entries and the lists the
+ * app starts with, so a device that joins sync later can't bring back
+ * something you deleted long ago.
+ */
+export const keepTombstone = (id) => id.startsWith(SEED_PREFIX) || DEFAULT_LIST_IDS.has(id);
 
 export function defaultState(now = Date.now(), today = todayKey()) {
   // updated: 0 = "never edited", so a new device joining sync never overrides real lists.
@@ -31,6 +56,7 @@ export function defaultState(now = Date.now(), today = todayKey()) {
     lists: [
       list({ id: 'anglican', name: 'Anglican Cycle of Prayer', type: 'cycle', kind: 'acp', source: 'acp' }),
       list({ id: 'diocese', name: 'Diocesan Cycle', type: 'monthly' }),
+      list({ id: 'diocese-daily', name: 'Diocesan Daily Cycle', type: 'dated' }),
       list({ id: 'trinity', name: 'Trinity', type: 'weekly', sort: 'last' }),
       list({ id: 'requests', name: 'Prayer Requests', type: 'daily' }),
       list({ id: 'family', name: 'Family', type: 'daily' }),
@@ -38,7 +64,7 @@ export function defaultState(now = Date.now(), today = todayKey()) {
     ],
     checks: {},
     tombstones: {},
-    settings: { seasonalColor: true, foldShortMonths: true, theme: 'auto', showPrayers: true, updated: 0 },
+    settings: { palette: 'burgundy', foldShortMonths: true, theme: 'auto', showPrayers: true, updated: 0 },
     orderUpdated: 0,
     meta: { created: now, lastBackup: null, quickAddList: 'requests', durations: {} },
   };
@@ -418,13 +444,16 @@ export class Store {
 
   /**
    * Spread a weekly list's names across the given weekdays in last-name order,
-   * keeping people who share a last name on the same day.
+   * keeping people who share a last name on the same day. The days are kept
+   * as the list's choice for next time.
    */
-  distributeWeekly(listId, days = [0, 1, 2, 3, 4, 5, 6]) {
+  distributeWeekly(listId, days = [1, 2, 3, 4, 5]) {
     return this.commit(() => {
       const list = this.list(listId);
       if (!list || !days.length) return;
       const t = this.stamp();
+      list.spreadDays = [...days].sort();
+      list.updated = t;
       const today = todayKey(new Date(this.clock()));
       for (const { day, items } of planSpread(list.items, days)) {
         for (const item of items) {
@@ -449,6 +478,58 @@ export class Store {
         list.overrides[entryId] = { ...prev, ...patch, updated: this.stamp() };
         delete list.overrides[entryId].reset;
       }
+    });
+  }
+
+  // ---------- built-in cycles copied into lists ----------
+
+  /**
+   * The first time this device runs, copy a built-in cycle (see seeds.js) into
+   * its lists, adding any list it needs. A list that already has entries is
+   * left alone, and so is anything you have deleted. The copied entries have
+   * fixed ids and times, so two devices that both copy them agree when they
+   * sync. Returns how many entries were added.
+   */
+  seed(seed) {
+    if (this.state.meta.seeded?.[seed.id]) return 0;
+    const today = todayKey(new Date(this.clock()));
+    return this.commit((s) => {
+      let added = 0;
+      for (const part of seed.lists) {
+        let list = s.lists.find((l) => l.id === part.list.id);
+        if (!list) {
+          if (s.tombstones[part.list.id]) continue;
+          list = { sort: 'added', items: [], updated: 0, since: today, ...part.list };
+          const after = s.lists.findIndex((l) => l.id === part.after);
+          s.lists.splice(after >= 0 ? after + 1 : s.lists.length, 0, list);
+        }
+        if (list.type !== part.list.type || list.items.length) continue;
+        part.entries.forEach((e, k) => {
+          const item = seedItem(seed, e, k, today);
+          if (s.tombstones[item.id]) return;
+          list.items.push(item);
+          added += 1;
+        });
+      }
+      s.meta.seeded = { ...(s.meta.seeded || {}), [seed.id]: this.clock() };
+      return added;
+    });
+  }
+
+  /** Put a built-in cycle's entries back in one of its lists, in place of what is there. */
+  reloadSeed(seed, listId) {
+    const part = seed.lists.find((p) => p.list.id === listId);
+    return this.commit((s) => {
+      const list = this.list(listId);
+      if (!part || !list || list.type !== part.list.type) return 0;
+      const t = this.stamp();
+      const today = todayKey(new Date(this.clock()));
+      const items = part.entries.map((e, k) => ({ ...seedItem(seed, e, k, today), updated: t }));
+      const ids = new Set(items.map((i) => i.id));
+      for (const i of list.items) if (!ids.has(i.id)) s.tombstones[i.id] = t;
+      for (const id of ids) delete s.tombstones[id];
+      list.items = items;
+      return items.length;
     });
   }
 
@@ -481,7 +562,7 @@ export class Store {
     }
     const oldest = this.clock() - TOMBSTONE_RETENTION_DAYS * 864e5;
     for (const [id, t] of Object.entries(this.state.tombstones)) {
-      if (t < oldest) {
+      if (t < oldest && !keepTombstone(id)) {
         delete this.state.tombstones[id];
         changed = true;
       }

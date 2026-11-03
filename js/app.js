@@ -10,12 +10,14 @@ import { renderToday } from './today.js';
 import { renderLists, renderListDetail } from './lists.js';
 import { renderSettings } from './settings.js';
 import { openAddSheet } from './sheets.js';
+import { SEEDS } from './seeds.js';
 
 const UI_KEY = 'prayer-tracker:ui';
 const root = document.documentElement;
 const view = document.getElementById('view');
 
 const store = new Store();
+for (const seed of SEEDS) store.seed(seed); // first run on this device: the diocese's cycles
 const sync = new SyncManager(store);
 
 const ua = navigator.userAgent;
@@ -95,18 +97,23 @@ function render() {
 
 const darkQuery = matchMedia('(prefers-color-scheme: dark)');
 
+const PALETTES = ['burgundy', 'blue', 'season'];
+
 function applyTheme() {
-  const { theme = 'auto', seasonalColor = true } = store.state.settings;
+  const { theme = 'auto', palette = 'burgundy' } = store.state.settings;
   const dark = theme === 'dark' || (theme === 'auto' && darkQuery.matches);
   const nextTheme = dark ? 'dark' : 'light';
-  // The accent is the liturgical colour of the day: the season's, or a feast's.
-  const nextSeason = seasonalColor ? dayTitle(app.today).color : 'none';
-  if (root.dataset.theme === nextTheme && root.dataset.season === nextSeason) return;
-  root.dataset.theme = nextTheme;
-  root.dataset.season = nextSeason;
+  const nextPalette = PALETTES.includes(palette) ? palette : 'burgundy';
+  // With the "Church year" palette, the accent is the liturgical colour of the day.
+  const nextSeason = dayTitle(app.today).color;
+  const d = root.dataset;
+  if (d.theme === nextTheme && d.palette === nextPalette && d.season === nextSeason) return;
+  d.theme = nextTheme;
+  d.palette = nextPalette;
+  d.season = nextSeason;
   const bg = getComputedStyle(root).getPropertyValue('--bg').trim();
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', bg || (dark ? '#141311' : '#f7f4ee'));
-  writeUi({ theme: nextTheme, season: nextSeason });
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', bg || (dark ? '#161110' : '#f6f0e8'));
+  writeUi({ theme: nextTheme, palette: nextPalette, season: nextSeason });
 }
 
 darkQuery.addEventListener?.('change', applyTheme);
