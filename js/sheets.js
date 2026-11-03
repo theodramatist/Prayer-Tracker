@@ -10,8 +10,8 @@ import { parseName, compareNames } from './names.js';
 import { WEEKDAYS, WEEKDAYS_SHORT, addDays, diffDays, formatShort, formatMedium, formatWithYear, weekday, parseKey, isValidKey, todayKey } from './dates.js';
 import { isPdf, pdfToText } from './pdf.js';
 
-/** The current cycle ("From Abu to Divine Hope via Zululand", Sept 2023 – Dec 2026). */
-export const ACP_URL = 'https://www.anglicancommunion.org/resource/from-abu-to-divine-hope-via-zululand/';
+/** Where the Anglican Communion publishes each edition of the cycle (as its PDF says). */
+export const ACP_URL = 'https://www.anglicancommunion.org/prayer';
 
 const field = (label, ...children) => h('div', { class: 'field' }, label && h('span', { class: 'field-label' }, label), children);
 

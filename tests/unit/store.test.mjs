@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 
 import { Store, STORAGE_KEY, migrate, defaultState, stampAsNewest } from '../../js/store.js';
 import { itemsDue, endDateFor, carriedOver, builtinEntries, cycleSource } from '../../js/schedule.js';
+import { BUNDLES } from '../../js/bundles.js';
+import { weekday } from '../../js/dates.js';
 
 function memoryStorage(initial = {}) {
   const data = { ...initial };
@@ -300,6 +302,7 @@ test('carry forward: unchecked weekly and monthly entries stay until checked or 
   const [amy, bob, cy] = store.addItems('trinity', [{ text: 'Amy Adams', day: 1 }, { text: 'Bob Brown', day: 2 }, { text: 'Cy Cole', day: 3 }]);
   const [paul] = store.addItems('diocese', [{ text: 'St Paul', day: 2 }]);
   store.addItems('family', [{ text: 'Mom' }]);
+  store.updateList('anglican', { hidden: true }); // keep the built-in cycle out of this test
   store.state.lists.find((l) => l.id === 'trinity').since = '2026-11-01';
   store.state.lists.find((l) => l.id === 'diocese').since = '2026-11-01';
   store.setChecked('2026-11-03', bob.id, true);
@@ -334,4 +337,32 @@ test('carried entries: older days first, and each day keeps the list’s own ord
   };
   const rows = carriedOver(state, '2026-11-04', () => false).get('t').map((r) => `${r.item.text}@${r.date}`);
   assert.deepEqual(rows, ['Amy Adams@2026-11-02', 'Bob Baker@2026-11-02', 'Cy Cole@2026-11-03']);
+});
+
+test('the built-in Anglican Cycle: today’s diocese, and a fresh start in 2027 on the same weekdays', () => {
+  const list = defaultState().lists.find((l) => l.id === 'anglican');
+  const on = (k) => itemsDue(list, k).map((e) => [e.text, e.note]);
+  assert.deepEqual(on('2023-09-01'), [['The Diocese of Zaki-Biam', 'The Church of Nigeria (Anglican Communion)']]);
+  assert.deepEqual(on('2026-11-02'), [['The Diocese of Carlisle', 'The Church of England']]);
+  assert.deepEqual(on('2026-11-29'), [['Hong Kong Sheng Kung Hui', undefined]]);
+  assert.deepEqual(on('2026-12-31'), [['The Diocese of Divine Hope', 'Igreja Anglicana de Mocambique e Angola']]);
+  assert.deepEqual(on('2027-01-01'), on('2023-09-01'));
+  assert.equal(weekday('2027-01-01'), weekday('2023-09-01'));
+  assert.equal(cycleSource(list, '2026-11-02').length, 1218);
+  // Sundays are for whole provinces.
+  for (const k of ['2026-11-01', '2026-11-08', '2026-11-15', '2026-11-22']) assert.equal(itemsDue(list, k)[0].note, undefined);
+});
+
+test('a newer edition takes over from its first day; the newest starts over after its last', () => {
+  const next = { id: 'acp2027', start: '2027-01-01', entries: [{ text: 'X' }, { text: 'Y' }] };
+  BUNDLES.acp.push(next);
+  try {
+    const list = defaultState().lists.find((l) => l.id === 'anglican');
+    assert.equal(itemsDue(list, '2026-12-31')[0].text, 'The Diocese of Divine Hope');
+    assert.deepEqual(itemsDue(list, '2027-01-01').map((e) => [e.id, e.text]), [['acp2027:0', 'X']]);
+    assert.equal(itemsDue(list, '2027-01-04')[0].text, 'Y');
+    assert.equal(cycleSource(list, '2027-02-01').length, 2);
+  } finally {
+    BUNDLES.acp.pop();
+  }
 });

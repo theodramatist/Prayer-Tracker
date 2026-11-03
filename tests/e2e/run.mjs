@@ -78,7 +78,7 @@ async function openList(id) {
 
 async function pasteInto(id, text, { choose } = {}) {
   await openList(id);
-  await page.locator('.toolbar button', { hasText: /Paste a list|Add the cycle/ }).click();
+  await page.locator('.toolbar button', { hasText: /Paste a list|Add the cycle|Load a newer cycle/ }).click();
   const sheet = page.locator('.sheet-import');
   await sheet.waitFor();
   await sheet.locator('textarea.import-text').fill(text);
@@ -96,12 +96,14 @@ async function goToday() {
 
 console.log('Prayer Tracker end-to-end\n Part 1: lists, cycles, check-offs, backup, offline');
 
-await step('first run shows setup cards for the three cycles', async () => {
+await step('first run: the Anglican Cycle is built in; the other two cycles ask to be set up', async () => {
   await page.goto(BASE);
   await page.locator('.day-head h1').waitFor();
   assert.equal(await heading(), 'Monday, November 2');
   assert.equal(await page.locator('.feast').innerText(), 'Season after Pentecost');
-  assert.deepEqual(await texts('.setup-card h2'), ['Anglican Cycle of Prayer', 'Diocesan Cycle', 'Trinity']);
+  assert.deepEqual(await texts('.group[data-list=anglican] .item-text'), ['The Diocese of Carlisle']);
+  assert.deepEqual(await texts('.group[data-list=anglican] .item-note'), ['The Church of England']);
+  assert.deepEqual(await texts('.setup-card h2'), ['Diocesan Cycle', 'Trinity']);
   await shot('01-first-run');
 });
 
@@ -130,10 +132,10 @@ await step('the add sheet remembers the last list and its duration', async () =>
 });
 
 await step('checking off makes an item disappear; undo brings it back', async () => {
-  assert.equal(await page.locator('.progress-text').innerText(), '0 of 4 prayed');
+  assert.equal(await page.locator('.progress-text').innerText(), '0 of 5 prayed');
   await page.locator('.item', { hasText: 'Mom' }).locator('.check').click();
   await eventually(async () => assert.deepEqual(await texts('.group[data-list=family] .item-text'), ['Dad', 'Aunt Sue']));
-  assert.equal(await page.locator('.progress-text').innerText(), '1 of 4 prayed');
+  assert.equal(await page.locator('.progress-text').innerText(), '1 of 5 prayed');
   await page.locator('.toast.show .toast-action').click();
   await eventually(async () => assert.deepEqual(await texts('.group[data-list=family] .item-text'), ['Mom', 'Dad', 'Aunt Sue']));
   await page.locator('.item', { hasText: 'Mom' }).locator('.check').click();
@@ -146,13 +148,13 @@ await step('"Show prayed" reveals checked items, which can be unchecked', async 
   await page.locator('.items-done .check').click();
   await eventually(async () => assert.equal(await page.locator('.items-done').count(), 0));
   await page.locator('.item', { hasText: 'Mom' }).locator('.check').click();
-  await eventually(async () => assert.equal(await page.locator('.progress-text').innerText(), '1 of 4 prayed'));
+  await eventually(async () => assert.equal(await page.locator('.progress-text').innerText(), '1 of 5 prayed'));
 });
 
 await step('check-offs and items survive a reload', async () => {
   await page.reload();
   await page.locator('.day-head h1').waitFor();
-  assert.equal(await page.locator('.progress-text').innerText(), '1 of 4 prayed');
+  assert.equal(await page.locator('.progress-text').innerText(), '1 of 5 prayed');
   assert.deepEqual(await texts('.group[data-list=family] .item-text'), ['Dad', 'Aunt Sue']);
 });
 
@@ -412,7 +414,7 @@ await step('backup: save, erase everything, restore', async () => {
   await page.locator('button', { hasText: 'Erase all data' }).click();
   await page.locator('.sheet-confirm .btn-danger-fill').click();
   await goToday();
-  assert.equal(await page.locator('.setup-card').count(), 3);
+  assert.equal(await page.locator('.setup-card').count(), 2); // the built-in Anglican Cycle needs no setup
 
   await page.click('.tabbar a[href="#/lists"]');
   await page.click('a[href="#/settings"]');

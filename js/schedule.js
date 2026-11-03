@@ -84,14 +84,14 @@ export function sortItems(list, items) {
  * Where a cycle list's days come from: its own entries (each with a `seq`, the
  * day number from `start`), or else a built-in cycle such as the Anglican Cycle.
  */
-export function cycleSource(list) {
+export function cycleSource(list, dateKey = null) {
   if (list.type !== 'cycle') return null;
   if (list.items.length) {
     let length = 0;
     for (const i of list.items) length = Math.max(length, (i.seq ?? 0) + 1);
     return { start: list.start || list.since, length, builtin: false };
   }
-  const bundle = bundleFor(list);
+  const bundle = bundleFor(list, dateKey);
   return bundle ? { start: bundle.start, length: bundle.entries.length, builtin: true, bundle } : null;
 }
 
@@ -150,7 +150,7 @@ export function itemsDue(list, dateKey, { foldShortMonths = true } = {}) {
       due = list.items.filter((i) => i.date === dateKey);
       break;
     case 'cycle': {
-      const src = cycleSource(list);
+      const src = cycleSource(list, dateKey);
       if (!src) { due = []; break; }
       const index = cycleIndex(src.start, src.length, dateKey);
       due = src.builtin ? builtinEntries(list, src.bundle, index) : list.items.filter((i) => (i.seq ?? 0) === index);

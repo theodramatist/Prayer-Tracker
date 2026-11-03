@@ -4,6 +4,7 @@
 import { h, icon, toast, plural } from './ui.js';
 import { LIST_TYPES, SORTS, sortItems, partitionByStatus, endLabel, datedRange, cycleSource, itemsDue, builtinEntries } from './schedule.js';
 import { WEEKDAYS, MONTHS, addDays, formatMedium, formatWithYear, formatShort, parseKey } from './dates.js';
+import { editionById } from './bundles.js';
 import { openAddSheet, openItemSheet, openImportSheet, openListSheet, openDistributeSheet, ACP_URL } from './sheets.js';
 
 function summary(list, today) {
@@ -30,7 +31,7 @@ function summary(list, today) {
       break;
     }
     case 'cycle': {
-      const src = cycleSource(list);
+      const src = cycleSource(list, today);
       text = src ? `Cycle · ${plural(src.length, 'day')}${src.builtin ? ' · built in' : ''}` : 'Cycle · nothing added yet';
       break;
     }
@@ -156,7 +157,7 @@ export function renderListDetail(app, id) {
       oninput: (e) => filterRows(e.target.value),
     }));
 
-  const src = cycleSource(list);
+  const src = cycleSource(list, app.today);
   const sub = list.type === 'cycle'
     ? [LIST_TYPES.cycle.label, src ? `${plural(src.length, 'day')} from ${formatWithYear(src.start)}, then it starts over` : 'nothing added yet']
     : [LIST_TYPES[list.type].label, `ordered by ${SORTS[list.sort].toLowerCase()}`];
@@ -209,7 +210,7 @@ function datedBody(app, list, sorted) {
 
 /** A cycle's coming days, and any entries you have changed. */
 function cycleBody(app, list) {
-  const src = cycleSource(list);
+  const src = cycleSource(list, app.today);
   if (!src) return [emptyState(app, list)];
   const days = app.cycleDays || 30;
   const rows = [];
@@ -230,8 +231,10 @@ function cycleBody(app, list) {
   const changed = Object.entries(list.overrides || {}).filter(([, o]) => !o.reset);
   if (src.builtin && changed.length) {
     const index = (id) => Number(id.split(':')[1]);
-    const items = changed.sort((a, b) => index(a[0]) - index(b[0])).map(([id, o]) => {
-      const e = builtinEntries({ ...list, overrides: {} }, src.bundle, index(id)).find((x) => x.id === id);
+    const items = changed.sort((a, b) => (a[0] < b[0] ? -1 : 1)).map(([id, o]) => {
+      const edition = editionById(list, id.split(':')[0]);
+      if (!edition) return null; // an edit to an edition no longer shipped
+      const e = builtinEntries({ ...list, overrides: {} }, edition, index(id)).find((x) => x.id === id);
       if (!e) return null;
       const shown = o.hidden ? { ...e, note: 'Hidden' } : { ...e, text: o.text ?? e.text, note: o.note ?? e.note, edited: true };
       return row(app, shown, { today: app.today, list, key: `Day ${index(id) + 1}`, badge: o.hidden ? 'Hidden' : 'Edited' });

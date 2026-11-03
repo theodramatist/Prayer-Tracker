@@ -8,7 +8,7 @@ It keeps four kinds of cycle, and shows everything due on a given day in one pla
 
 | Cycle | Repeats | Comes set up as |
 | --- | --- | --- |
-| **Anglican Cycle of Prayer** | a different diocese or province each day, starting over at the end | *Anglican Cycle of Prayer*, built in (see below) |
+| **Anglican Cycle of Prayer** | a different diocese or province each day, starting over at the end | *Anglican Cycle of Prayer*, built in: nothing to set up |
 | **Diocesan cycle** | a different church each day of the month (1–31) | *Diocesan Cycle* (paste your diocese's list) |
 | **Parish cycle** | a different list of names each day of the week | *Trinity*: type names First Last; they sort by last name |
 | **Daily** | every day, either ongoing or for a set time you choose when adding | *Prayer Requests*, *Family*, *Clergy* |
@@ -43,25 +43,33 @@ You can rename, reorder, hide or delete any of these, and make more lists of any
 
 ### The Anglican Cycle of Prayer
 
-The app shows the Anglican Communion's cycle one day at a time, and starts it over from
-the beginning when it ends. The current cycle, *From Aba to Divine Hope via Zululand*,
-runs from 1 September 2023 to 31 December 2026. That is exactly 174 weeks, so when it
-restarts on 1 January 2027 each diocese keeps its weekday.
+The Anglican Communion's cycle is built into the app, one checkable entry a day: the
+diocese, with its province beneath (on Sundays, a whole province). The current cycle,
+*From Abu to Divine Hope via Zululand*, runs from 1 September 2023 to 31 December 2026.
+That is exactly 174 weeks, so if no newer edition has been added, it starts over on
+1 January 2027 and each diocese keeps its weekday.
 
 - If a diocese has merged or been renamed, tap it and change the wording; the original
   is kept underneath so you can restore it. Your edits are listed on the list's page.
-- When the new cycle is published, **Lists → Anglican Cycle of Prayer → Load a newer
-  cycle** reads its PDF (or pasted text) on your device.
+- **Lists → Anglican Cycle of Prayer → Load a newer cycle** can also read a new
+  edition's PDF on your device.
 
-**Building the cycle into the app.** The built-in data lives in `js/data/acp.js` and is
-made from the Anglican Communion's PDF with one command:
+**Adding the next edition to the app.** The PDF says the next edition, from 1 January
+2027, is available at [anglicancommunion.org/prayer](https://www.anglicancommunion.org/prayer).
+Build it with
 
 ```
-node scripts/build-acp.mjs path/to/acp_from-aba-to-divine-hope-via-zululand-2023-to-2026_webpdf.pdf \
-  --title "From Aba to Divine Hope via Zululand"
+node scripts/build-acp.mjs path/to/the-2027-edition.pdf --title "…" --out js/data/acp-2027.js
 ```
 
-Until that has been run, the app asks you to add the cycle from the PDF instead.
+then import it in `js/bundles.js` and add it to the end of `BUNDLES.acp`. Each date uses
+the edition that has begun by then, so the app moves to the new edition on its first day.
+The current edition was built the same way, into `js/data/acp.js`. The builder reads the
+bold entries and leaves out the PDF's italic labels ("Season of Creation", "Advent 1"),
+because the app shows the Episcopal calendar instead.
+
+The Anglican Cycle of Prayer is © The Anglican Consultative Council 2023. It may be
+freely copied and shared on the condition that no charge is made for its use.
 
 ### Setting up the other cycles
 
