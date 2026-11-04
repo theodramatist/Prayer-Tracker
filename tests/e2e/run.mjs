@@ -100,7 +100,7 @@ await step('first run: the Anglican Cycle is built in, the diocese’s cycles ar
   await page.goto(BASE);
   await page.locator('.day-head h1').waitFor();
   assert.equal(await heading(), 'Monday, November 2');
-  assert.equal(await page.locator('.feast').innerText(), 'Season after Pentecost');
+  assert.equal(await page.locator('.feast').innerText(), 'The Season after Pentecost');
   assert.deepEqual(await texts('.group[data-list=anglican] .item-text'), ['The Diocese of Carlisle']);
   assert.deepEqual(await texts('.group[data-list=anglican] .item-note'), ['The Church of England']);
   // The 2nd of the month in the diocese's monthly cycle, with each church's clergy.
@@ -689,7 +689,7 @@ await step('the feast of the day and its colour', async () => {
   assert.equal(await page.locator('.day-head').getAttribute('data-color'), 'blue');
   await shot('21-advent');
   await page.evaluate(() => window.prayerTracker.setDate('2026-11-08'));
-  assert.equal(await page.locator('.feast').innerText(), 'The Twenty-fourth Sunday after Pentecost');
+  assert.equal(await page.locator('.feast').innerText(), 'The Twenty-Fourth Sunday after Pentecost');
   assert.equal(await page.locator('.feast-detail').innerText(), 'PROPER 27');
   await page.click('.back-today');
 });

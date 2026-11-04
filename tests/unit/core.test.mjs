@@ -293,19 +293,19 @@ test('liturgical calendar', () => {
   assert.equal(adventSunday(2022), '2022-11-27');
   assert.equal(adventSunday(2023), '2023-12-03');
   const name = (k) => season(k).name;
-  assert.equal(name('2026-11-02'), 'Season after Pentecost');
-  assert.equal(name('2026-11-29'), 'Advent');
-  assert.equal(name('2026-12-24'), 'Advent');
-  assert.equal(name('2026-12-25'), 'Christmas');
-  assert.equal(name('2027-01-05'), 'Christmas');
+  assert.equal(name('2026-11-02'), 'The Season after Pentecost');
+  assert.equal(name('2026-11-29'), 'Advent Season');
+  assert.equal(name('2026-12-24'), 'Advent Season');
+  assert.equal(name('2026-12-25'), 'Christmas Season');
+  assert.equal(name('2027-01-05'), 'Christmas Season');
   assert.equal(name('2027-01-06'), 'The Epiphany');
-  assert.equal(name('2027-02-09'), 'Season after the Epiphany');
+  assert.equal(name('2027-02-09'), 'Epiphany Season');
   assert.equal(name('2027-02-10'), 'Ash Wednesday');
   assert.equal(name('2027-03-21'), 'Holy Week'); // Palm Sunday
   assert.equal(name('2027-03-28'), 'Easter Day');
   assert.equal(name('2027-05-15'), 'Easter Season');
-  assert.equal(name('2027-05-16'), 'Day of Pentecost');
-  assert.equal(name('2027-05-17'), 'Season after Pentecost');
+  assert.equal(name('2027-05-16'), 'The Day of Pentecost');
+  assert.equal(name('2027-05-17'), 'The Season after Pentecost');
   assert.equal(season('2026-11-29').color, 'blue');
   assert.equal(season('2027-03-01').color, 'violet');
 });

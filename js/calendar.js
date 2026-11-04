@@ -2,14 +2,18 @@
 // Common Prayer 1979): Principal Feasts, named Sundays with their Propers,
 // Holy Week, and the fixed Holy Days, moved by the Prayer Book's rules when
 // they fall on a Sunday, on Ash Wednesday, or in Holy Week or Easter Week.
+// The titles are the Prayer Book's own ("The Titles of the Seasons, Sundays,
+// and Major Holy Days observed in this Church throughout the Year", pages
+// 31-33), and each Sunday after Pentecost takes the numbered Proper whose
+// date is closest (pages 158 and 225-236).
 
 import { addDays, weekday, parseKey, keyFromParts, diffDays } from './dates.js';
 import { easter, adventSunday, season } from './liturgy.js';
 
 const ORDINALS = ['', 'First', 'Second', 'Third', 'Fourth', 'Fifth', 'Sixth', 'Seventh', 'Eighth', 'Ninth',
   'Tenth', 'Eleventh', 'Twelfth', 'Thirteenth', 'Fourteenth', 'Fifteenth', 'Sixteenth', 'Seventeenth',
-  'Eighteenth', 'Nineteenth', 'Twentieth', 'Twenty-first', 'Twenty-second', 'Twenty-third', 'Twenty-fourth',
-  'Twenty-fifth', 'Twenty-sixth', 'Twenty-seventh', 'Twenty-eighth', 'Twenty-ninth'];
+  'Eighteenth', 'Nineteenth', 'Twentieth', 'Twenty-First', 'Twenty-Second', 'Twenty-Third', 'Twenty-Fourth',
+  'Twenty-Fifth', 'Twenty-Sixth', 'Twenty-Seventh', 'Twenty-Eighth', 'Twenty-Ninth'];
 
 // [month-day, title, liturgical colour, options]
 const HOLY_DAYS = [
@@ -26,7 +30,7 @@ const HOLY_DAYS = [
   ['06-11', 'Saint Barnabas the Apostle', 'red'],
   ['06-24', 'The Nativity of Saint John the Baptist', 'white'],
   ['06-29', 'Saint Peter and Saint Paul, Apostles', 'red'],
-  ['07-04', 'Independence Day', null, { civil: true }],
+  ['07-04', 'Independence Day', null, { national: true }],
   ['07-22', 'Saint Mary Magdalene', 'white'],
   ['07-25', 'Saint James the Apostle', 'red'],
   ['08-06', 'The Transfiguration of Our Lord Jesus Christ', 'white', { lord: true }],
@@ -55,7 +59,7 @@ function movable(year) {
   const ez = easter(year);
   const out = new Map();
   const set = (k, title, color, rank = 'principal') => out.set(k, { title, color, rank });
-  set(addDays(ez, -46), 'Ash Wednesday', 'violet', 'fast');
+  set(addDays(ez, -46), 'The First Day of Lent, or Ash Wednesday', 'violet', 'fast');
   set(addDays(ez, -7), 'The Sunday of the Passion: Palm Sunday', 'red', 'sunday');
   set(addDays(ez, -6), 'Monday in Holy Week', 'red', 'holyweek');
   set(addDays(ez, -5), 'Tuesday in Holy Week', 'red', 'holyweek');
@@ -63,14 +67,14 @@ function movable(year) {
   set(addDays(ez, -3), 'Maundy Thursday', 'white', 'holyweek');
   set(addDays(ez, -2), 'Good Friday', 'red', 'fast');
   set(addDays(ez, -1), 'Holy Saturday', 'violet', 'holyweek');
-  set(ez, 'Easter Day', 'white');
+  set(ez, 'The Sunday of the Resurrection, or Easter Day', 'white');
   for (const [n, day] of [[1, 'Monday'], [2, 'Tuesday'], [3, 'Wednesday'], [4, 'Thursday'], [5, 'Friday'], [6, 'Saturday']]) {
     set(addDays(ez, n), `${day} in Easter Week`, 'white', 'easterweek');
   }
   set(addDays(ez, 39), 'Ascension Day', 'white');
   set(addDays(ez, 49), 'The Day of Pentecost: Whitsunday', 'red');
-  set(addDays(ez, 56), 'Trinity Sunday', 'white');
-  set(fixed(year, '01-06'), 'The Epiphany', 'white');
+  set(addDays(ez, 56), 'The First Sunday after Pentecost: Trinity Sunday', 'white');
+  set(fixed(year, '01-06'), 'The Epiphany, or the Manifestation of Christ to the Gentiles', 'white');
   set(fixed(year, '11-01'), 'All Saints’ Day', 'white');
   set(fixed(year, '12-25'), 'The Nativity of Our Lord Jesus Christ: Christmas Day', 'white');
   return out;
@@ -98,11 +102,11 @@ function holyDays(year) {
 
   for (const [md, title, color, opts = {}] of HOLY_DAYS) {
     const k = fixed(year, md);
-    if (opts.civil) { kept.set(k, { title, color, rank: 'civil' }); continue; }
+    // Independence Day is a Major Feast too, so on a Sunday it moves like the others.
     if (k >= palm && k <= easterWeekEnd) { afterEaster.push({ title, color, from: k }); continue; }
     if (opts.lord && weekday(k) === 0 && !principal.has(k)) { kept.set(k, { title, color, rank: 'holyday' }); continue; }
     const day = open(k) ? k : nextOpen(addDays(k, 1));
-    kept.set(day, { title, color, rank: 'holyday', transferred: day !== k ? k : null });
+    kept.set(day, { title, color, rank: opts.national ? 'national' : 'holyday', transferred: day !== k ? k : null });
   }
   // Holy Days in Holy Week or Easter Week move to the week after the Second Sunday of Easter, in order.
   let k = addDays(ez, 8);
@@ -112,7 +116,7 @@ function holyDays(year) {
     k = addDays(k, 1);
   }
   const tg = thanksgiving(year);
-  if (!kept.has(tg)) kept.set(tg, { title: 'Thanksgiving Day', color: null, rank: 'civil' });
+  if (!kept.has(tg)) kept.set(tg, { title: 'Thanksgiving Day', color: null, rank: 'national' });
 
   const result = { principal, kept };
   yearCache.set(year, result);
@@ -138,7 +142,7 @@ function sundayName(dateKey) {
     const epiphany = keyFromParts(y, 1, 6);
     if (dateKey === addDays(ash, -3)) return { title: 'The Last Sunday after the Epiphany', color: 'white' };
     const n = Math.ceil(diffDays(epiphany, dateKey) / 7);
-    if (n === 1) return { title: 'The First Sunday after the Epiphany: The Baptism of Our Lord', color: 'white' };
+    if (n === 1) return { title: 'The First Sunday after the Epiphany: The Baptism of Our Lord Jesus Christ', color: 'white' };
     return { title: `The ${ORDINALS[n]} Sunday after the Epiphany`, color: 'green' };
   }
   if (dateKey < addDays(ez, -7)) {
@@ -153,7 +157,7 @@ function sundayName(dateKey) {
   const n = diffDays(pentecost, dateKey) / 7;
   const proper = Math.round(diffDays(keyFromParts(y, 5, 11), dateKey) / 7) + 1;
   if (dateKey === addDays(advent, -7)) {
-    return { title: 'The Last Sunday after Pentecost', color: 'white', detail: 'Proper 29 · Christ the King' };
+    return { title: 'The Last Sunday after Pentecost', color: 'white', detail: 'Proper 29' };
   }
   return { title: `The ${ORDINALS[n]} Sunday after Pentecost`, color: 'green', detail: `Proper ${proper}` };
 }
@@ -168,11 +172,6 @@ export function observance(dateKey) {
   if (principal.has(dateKey)) return { ...principal.get(dateKey) };
   if (kept.has(dateKey)) {
     const h = kept.get(dateKey);
-    if (h.rank === 'civil' && weekday(dateKey) === 0) {
-      // Independence Day on a Sunday: the Sunday comes first.
-      const s = sundayName(dateKey);
-      return { ...s, rank: 'sunday', detail: [s.detail, h.title].filter(Boolean).join(' · ') };
-    }
     const out = { ...h };
     if (h.transferred) out.detail = 'Transferred';
     if (weekday(dateKey) === 0) out.detail = sundayName(dateKey).title;
@@ -181,7 +180,8 @@ export function observance(dateKey) {
   if (weekday(dateKey) === 0) {
     const s = sundayName(dateKey);
     const nov1 = keyFromParts(y, 11, 1);
-    if (dateKey > nov1 && diffDays(nov1, dateKey) < 7) s.detail = `${s.detail} · All Saints’ Sunday`;
+    // "All Saints' Day may always be observed on the Sunday following November 1."
+    if (dateKey > nov1 && diffDays(nov1, dateKey) < 7) s.detail = `${s.detail} · or All Saints’ Day`;
     return { ...s, rank: 'sunday' };
   }
   return null;

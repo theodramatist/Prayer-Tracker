@@ -40,15 +40,16 @@ export function season(dateKey) {
   const pentecost = addDays(ez, 49);
   const advent = adventSunday(y);
 
-  if (md >= 1225 || md <= 105) return { name: 'Christmas', color: 'white' };
+  // The seasons as the Prayer Book titles them (pages 31-32).
+  if (md >= 1225 || md <= 105) return { name: 'Christmas Season', color: 'white' };
   if (md === 106) return { name: 'The Epiphany', color: 'white' };
-  if (dateKey >= advent) return { name: 'Advent', color: 'blue' };
-  if (dateKey < ash) return { name: 'Season after the Epiphany', color: 'green' };
+  if (dateKey >= advent) return { name: 'Advent Season', color: 'blue' };
+  if (dateKey < ash) return { name: 'Epiphany Season', color: 'green' };
   if (dateKey === ash) return { name: 'Ash Wednesday', color: 'violet' };
-  if (dateKey < palm) return { name: 'Lent', color: 'violet' };
+  if (dateKey < palm) return { name: 'Lenten Season', color: 'violet' };
   if (dateKey < ez) return { name: 'Holy Week', color: 'red' };
   if (dateKey === ez) return { name: 'Easter Day', color: 'white' };
   if (dateKey < pentecost) return { name: 'Easter Season', color: 'white' };
-  if (dateKey === pentecost) return { name: 'Day of Pentecost', color: 'red' };
-  return { name: 'Season after Pentecost', color: 'green' };
+  if (dateKey === pentecost) return { name: 'The Day of Pentecost', color: 'red' };
+  return { name: 'The Season after Pentecost', color: 'green' };
 }

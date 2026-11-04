@@ -22,11 +22,14 @@ export const RITES = [
 ];
 export const DEFAULT_RITE = 'contemporary';
 
+// The collect after the reading of Abraham's sacrifice of Isaac (Genesis 22),
+// as printed on page 289.
 const VIGIL = {
   id: 'vigil',
   kind: 'prayer',
   section: 'From the Great Vigil of Easter',
   title: 'From the Great Vigil of Easter',
+  page: 289,
   text: 'God and Father of all believers, for the glory of your Name multiply, by the grace of the Paschal sacrament, the number of your children; that your Church may rejoice to see fulfilled your promise to our father Abraham; through Jesus Christ our Lord. Amen.',
 };
 

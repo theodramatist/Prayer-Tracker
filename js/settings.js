@@ -205,7 +205,7 @@ export function renderSettings(app) {
         options: [{ value: 'burgundy', label: 'Burgundy' }, { value: 'blue', label: 'Blue' }, { value: 'season', label: 'Church year' }],
         onChange: (v) => store.setSetting('palette', v),
       })),
-      h('p', { class: 'hint' }, `Church year colours the app by the liturgical day: now ${dayTitle(app.today).color}, ${dayTitle(app.today).title}. The ribbon on Today always shows the day’s colour.`),
+      h('p', { class: 'hint' }, `Church year colours the app by the liturgical day: now ${dayTitle(app.today).color} (${dayTitle(app.today).title}). The ribbon on Today always shows the day’s colour.`),
       field('Theme', chipGroup({
         label: 'Theme',
         value: s.theme,

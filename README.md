@@ -262,7 +262,9 @@ npm run icons       # re-render the PNG icons from the SVG artwork
 Layout: `index.html`, `css/app.css`, and ES modules in `js/`:
 
 - `schedule.js` decides what is due on a date, including cycles and carry-forward.
-- `calendar.js` holds the BCP 1979 calendar (feasts, named Sundays, Propers, transfers);
+- `calendar.js` holds the BCP 1979 calendar (feasts, named Sundays, Propers, transfers),
+  with the Prayer Book's own titles (pages 31–33), checked against its calendar and
+  collects;
   `liturgy.js` works out seasons and Easter.
 - `prayers.js` holds the prayers, from `data/prayers.js`: the Prayer Book's Prayers and
   Thanksgivings exactly as printed, built from its PDF by
