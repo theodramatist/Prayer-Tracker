@@ -627,6 +627,15 @@ const FAKE_DIOCESE = `export default { id: 'wistest', diocese: 'Test diocese', u
   monthly: [{ day: 15, text: 'St. Test’s, Testville', note: 'Tess Tester, Rector' }],
   daily: [{ date: '2026-11-15', text: 'Tess Tester', note: 'Rector, St. Test’s, Testville' }] };`;
 await context2.route('**/js/data/diocese.js', (route) => route.fulfill({ contentType: 'text/javascript', body: FAKE_DIOCESE }));
+// Trinity's prayer request form: record what the app sends it.
+const formPosts = [];
+let formUnreachable = false;
+await context2.route('https://docs.google.com/forms/**', async (route) => {
+  if (formUnreachable) return route.abort('internetdisconnected');
+  const req = route.request();
+  formPosts.push({ method: req.method(), url: req.url(), body: new URLSearchParams(req.postData() || '') });
+  await route.fulfill({ status: 200, contentType: 'text/html', body: '<p>Your response has been recorded.</p>' });
+});
 await context2.route('https://api.github.com/**', async (route) => {
   const req = route.request();
   const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'authorization, content-type, accept, x-github-api-version', 'access-control-allow-methods': 'GET, PUT, OPTIONS' };
@@ -814,6 +823,94 @@ await step('sync: refuses a bad token, connects to a private repository, and pic
   await eventually(async () => assert.ok((ghDoc().checks['2026-11-03'] || {})['from-ipad'] > 0), 6000);
 });
 
+async function addSharing(text, { name = null, choice = null } = {}) {
+  await page.click('.tab-add');
+  const sheet = page.locator('.sheet-add');
+  await sheet.waitFor();
+  await sheet.locator('textarea.add-text').fill(text);
+  await sheet.locator('.chips-lists .chip', { hasText: 'Prayer Requests' }).click();
+  await sheet.locator('.share .toggle-row label').click();
+  await sheet.locator('.share-body').waitFor();
+  if (name != null) await sheet.locator('.share-body input[aria-label^="Your name"]').fill(name);
+  if (choice) await sheet.locator('.radio-row', { hasText: choice }).click();
+  return sheet;
+}
+
+await step('share a prayer request with Trinity: the form’s questions come down, and it goes a moment later', async () => {
+  await page.evaluate(() => { window.prayerTracker.shareDelay = 400; });
+  await page.click('.tab-add');
+  const sheet = page.locator('.sheet-add');
+  await sheet.waitFor();
+  await sheet.locator('textarea.add-text').fill('Jane Roe – surgery Friday');
+  await sheet.locator('.chips-lists .chip', { hasText: 'Prayer Requests' }).click();
+  assert.equal(await sheet.locator('.share-body').isVisible(), false);
+  await sheet.locator('.share .toggle-row label').click();
+  await sheet.locator('.share-body').waitFor();
+  assert.equal(await sheet.locator('.share-body textarea').inputValue(), 'Jane Roe – surgery Friday');
+  assert.deepEqual(await texts('.sheet-add .radio-row'), [
+    'Only share my name and prayer request with clergy and staff.',
+    'Share my prayer request with members of the congregation, but keep my name anonymous.',
+    'Share my prayer request and name with members of the congregation.']);
+  // The form needs a name.
+  await sheet.locator('button[type=submit]').click();
+  assert.match(await sheet.locator('.share-error').innerText(), /needs your name/);
+  await sheet.locator('.share-body input[aria-label^="Your name"]').fill('Pat Example');
+  await sheet.locator('.radio-row', { hasText: 'keep my name anonymous' }).click();
+  assert.equal(await sheet.locator('button[type=submit]').innerText(), 'Add and share');
+  await shot('32b-share-with-trinity');
+  await sheet.locator('button[type=submit]').click();
+  await sheet.waitFor({ state: 'detached' });
+  await eventually(async () => assert.equal(formPosts.length, 1), 6000);
+  assert.equal(formPosts[0].method, 'POST');
+  assert.equal(formPosts[0].url, 'https://docs.google.com/forms/d/e/1FAIpQLSceBPekpqOMedX0hZYr27AjsuaDFwjs0W_eftoAQvaK197Q3Q/formResponse');
+  assert.deepEqual(Object.fromEntries(formPosts[0].body), {
+    'entry.597871476': 'Pat Example',
+    'entry.670633233': 'Jane Roe – surgery Friday',
+    'entry.764039509': 'No',
+    'entry.1294983933': 'Share my prayer request with members of the congregation, but keep my name anonymous.',
+  });
+  await eventually(async () => assert.match(await page.locator('.toast.show').innerText(), /Sent to Trinity’s prayer list/));
+  // On your own list it's marked shared, and can be sent again (Trinity keeps a request a month).
+  await page.locator('.item', { hasText: 'Jane Roe' }).locator('.item-body').click();
+  const edit = page.locator('.sheet-item');
+  await edit.waitFor();
+  assert.match(await edit.innerText(), /shared with Trinity Tue, Nov 3/);
+  await edit.locator('.link-btn', { hasText: 'Share with Trinity again' }).click();
+  const again = page.locator('.sheet-share');
+  await again.waitFor();
+  assert.equal(await again.locator('input[aria-label^="Your name"]').inputValue(), 'Pat Example'); // remembered
+  assert.ok(await again.locator('.radio-row', { hasText: 'keep my name anonymous' }).locator('input').isChecked());
+  assert.match(await again.locator('.share-open').getAttribute('href') || '', /viewform/);
+  await shot('32c-share-again');
+  await again.locator('.sheet-close').click();
+  await again.waitFor({ state: 'detached' });
+});
+
+await step('a share can be undone before it goes, and waits while offline', async () => {
+  await page.evaluate(() => { window.prayerTracker.shareDelay = 2500; });
+  let sheet = await addSharing('Undo me');
+  await sheet.locator('button[type=submit]').click();
+  await sheet.waitFor({ state: 'detached' });
+  await page.locator('.toast.show .toast-action').click();
+  await sleep(3200);
+  assert.equal(formPosts.length, 1);
+  assert.equal(await page.locator('.item', { hasText: 'Undo me' }).count(), 0);
+
+  await page.evaluate(() => { window.prayerTracker.shareDelay = 400; });
+  formUnreachable = true; // as if offline
+  sheet = await addSharing('Bob Doe – new job');
+  await sheet.locator('button[type=submit]').click();
+  await sheet.waitFor({ state: 'detached' });
+  await eventually(async () => assert.match(await page.locator('.toast.show').innerText({ timeout: 1000 }), /No connection yet/), 6000);
+  assert.equal(formPosts.length, 1);
+  assert.equal(await page.evaluate(() => window.prayerTracker.store.state.meta.outbox.length), 1);
+  formUnreachable = false;
+  // (The page's clock is fixed, so nothing ages past the Undo moment by itself.)
+  await page.evaluate(() => { window.prayerTracker.shareDelay = 0; window.dispatchEvent(new Event('online')); });
+  await eventually(async () => assert.equal(formPosts.length, 2), 8000);
+  assert.equal(formPosts[1].body.get('entry.670633233'), 'Bob Doe – new job');
+});
+
 await step('colours: burgundy on ivory unless blue or the church year is chosen', async () => {
   const root = (k) => page.evaluate((key) => document.documentElement.dataset[key], k);
   const accent = () => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--accent').trim());
@@ -851,7 +948,8 @@ await step('part 2 light and dark screenshots', async () => {
 });
 
 await step('no errors in the console (part 2)', async () => {
-  const real = problems2.filter((p) => !/Failed to load resource: the server responded with a status of (401|404)/.test(p));
+  // The offline share step makes Chromium log the requests it couldn't make.
+  const real = problems2.filter((p) => !/Failed to load resource: the server responded with a status of (401|404)|net::ERR_INTERNET_DISCONNECTED|Failed to fetch/.test(p));
   assert.deepEqual(real, []);
 });
 

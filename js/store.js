@@ -395,6 +395,17 @@ export class Store {
     });
   }
 
+  /** Note that an entry was shared somewhere (say, Trinity's prayer list) on a date. */
+  markShared(itemId, where, dateKey) {
+    return this.commit(() => {
+      const found = this.findItem(itemId);
+      if (!found) return null;
+      found.item.shared = { ...(found.item.shared || {}), [where]: dateKey };
+      found.item.updated = this.stamp();
+      return found.item;
+    });
+  }
+
   /** Move an item to another list, setting whatever that list type needs. */
   moveItem(itemId, toListId, fields = {}) {
     return this.commit(() => {

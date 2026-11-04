@@ -1,11 +1,12 @@
-// Bottom sheets: quick add, edit an item, paste a list, list settings,
-// and spreading a weekly list over the week.
+// Bottom sheets: quick add, edit an item, share a request with Trinity,
+// paste a list, list settings, and spreading a weekly list over the week.
 
 import { h, icon, replace, openSheet, confirmSheet, toast, chipGroup, toggle, autoGrow, plural } from './ui.js';
 import { DURATIONS, endDateFor, sortItems, nameOf, planSpread, LIST_TYPES, SORTS, cycleSource } from './schedule.js';
 import { PRAYERS, SOURCE as PRAYER_SOURCE, prayerFor } from './prayers.js';
 import { bundleFor } from './bundles.js';
 import { seedFor } from './seeds.js';
+import { TRINITY_FORM, prefilledUrl, missingAnswers, queueShare, cancelShare, flushOutbox } from './share.js';
 import { parseList, parseWeekly, parseMonthly, parseDated } from './importer.js';
 import { parseName, compareNames } from './names.js';
 import { WEEKDAYS, WEEKDAYS_SHORT, addDays, diffDays, formatShort, formatMedium, formatWithYear, weekday, parseKey, isValidKey, todayKey } from './dates.js';
@@ -174,6 +175,140 @@ function dateInput(value, onChange, label = 'Date') {
 
 const TYPE_ORDER = ['daily', 'weekly', 'monthly', 'dated'];
 
+// ---------- sharing a request with Trinity ----------
+
+/** Lists whose entries can be shared with Trinity's prayer list: your own daily ones. */
+export const canShare = (list) => list?.type === 'daily';
+
+/**
+ * The questions on Trinity's prayer request form, with a "Share with Trinity"
+ * switch above them (unless `fixed`). Your name and sharing choice are
+ * remembered for next time. `request()` gives the text to start from; it
+ * follows what you type in the entry until you change it here.
+ */
+function shareFields(app, { request: from = () => '', fixed = false } = {}) {
+  const { store } = app;
+  const form = TRINITY_FORM;
+  const saved = store.state.settings.share?.[form.id] || {};
+  let on = fixed;
+  let died = false;
+  let sharing = form.sharing.includes(saved.sharing) ? saved.sharing : form.sharing[0];
+  let edited = false;
+  const group = `share-${Math.random().toString(36).slice(2, 8)}`;
+
+  const name = h('input', { class: 'input', value: saved.name || '', placeholder: 'First and last name', autocomplete: 'name', autocapitalize: 'words', 'aria-label': 'Your name, first and last' });
+  const request = h('textarea', { class: 'input', rows: 3, 'aria-label': 'How can we pray for you?' });
+  request.value = from();
+  request.addEventListener('input', () => { edited = true; });
+  const error = h('p', { class: 'hint share-error', hidden: true });
+  for (const input of [name, request]) input.addEventListener('input', () => { error.hidden = true; });
+  const choices = h('div', { class: 'radio-list', role: 'radiogroup', 'aria-label': 'Who would you like your prayer request shared with?' },
+    form.sharing.map((choice) => h('label', { class: 'radio-row' },
+      h('input', { type: 'radio', name: group, value: choice, checked: choice === sharing, onchange: () => { sharing = choice; } }),
+      h('span', null, choice))));
+  const answers = () => ({ name: name.value, request: request.value, died, sharing });
+
+  const body = h('div', { class: 'share-body', hidden: !on },
+    !fixed && h('p', { class: 'hint' }, 'Also sent to Trinity’s prayer request form, a few seconds after you add it.'),
+    field('What’s your name (first and last)?', name),
+    field('How can we pray for you?', request, h('p', { class: 'hint' }, 'If it’s for someone else, include their name.')),
+    field('Is this a prayer request for someone who has died?', chipGroup({
+      label: 'Is this a prayer request for someone who has died?',
+      value: 'no',
+      options: [{ value: 'no', label: 'No' }, { value: 'yes', label: 'Yes' }],
+      onChange: (v) => { died = v === 'yes'; },
+    })),
+    field('Who would you like your prayer request shared with?', choices),
+    h('p', { class: 'hint' }, 'Trinity prays for a request for one month. For an ongoing one, share it again each month: tap it, then Share with Trinity.'),
+    error,
+    fixed && h('a', {
+      class: 'link-btn share-open',
+      href: form.view,
+      target: '_blank',
+      rel: 'noopener',
+      onclick: (e) => { e.currentTarget.href = prefilledUrl(form, answers()); },
+    }, icon('link'), 'Or open the form itself, filled in'));
+
+  const toggleRow = !fixed && toggle({
+    label: 'Share with Trinity',
+    hint: 'Send this request to Trinity’s prayer list too.',
+    checked: false,
+    onChange: (v) => {
+      on = v;
+      body.hidden = !v;
+      if (v && !edited) request.value = from();
+      if (v && !name.value.trim()) name.focus();
+      onToggle?.(v);
+    },
+  });
+  let onToggle = null;
+
+  return {
+    el: h('div', { class: 'share' }, toggleRow, body),
+    get on() { return on; },
+    set onToggle(fn) { onToggle = fn; },
+    /** Keep the request in step with the entry being typed. */
+    follow() { if (!edited) request.value = from(); },
+    answers,
+    /** True when everything the form needs is filled in; otherwise says what's missing. */
+    check() {
+      const missing = missingAnswers(form, answers());
+      if (!missing.length) { error.hidden = true; return true; }
+      error.hidden = false;
+      error.textContent = missing.includes('name') ? 'Trinity’s form needs your name.' : 'Say how Trinity can pray.';
+      (missing.includes('name') ? name : request).focus();
+      return false;
+    },
+    /** Remember your name and sharing choice for next time. */
+    remember() {
+      const a = answers();
+      const next = { name: a.name.trim(), sharing: a.sharing };
+      const prev = store.state.settings.share?.[form.id] || {};
+      if (prev.name !== next.name || prev.sharing !== next.sharing) {
+        store.setSetting('share', { ...(store.state.settings.share || {}), [form.id]: next });
+      }
+    },
+  };
+}
+
+/** Send what's waiting once the Undo moment has passed, and say how it went. */
+function sendSharesSoon(app) {
+  setTimeout(async () => {
+    const { sent, waiting } = await flushOutbox(app.store);
+    if (sent) toast(sent === 1 ? 'Sent to Trinity’s prayer list' : `Sent ${sent} requests to Trinity’s prayer list`);
+    else if (waiting) toast('No connection yet. It will go to Trinity when you’re back online.');
+  }, app.shareDelay ?? 5500);
+}
+
+/** Share an entry already on a list with Trinity (again, for an ongoing request). */
+export function openShareSheet(app, itemId) {
+  const { store } = app;
+  const found = store.findItem(itemId);
+  if (!found) return null;
+  const { item } = found;
+  const share = shareFields(app, { request: () => [item.text, item.note].filter(Boolean).join(' — '), fixed: true });
+  const last = item.shared?.[TRINITY_FORM.id];
+  const submit = h('button', { class: 'btn btn-primary btn-block', type: 'submit' }, last ? 'Send to Trinity again' : 'Send to Trinity');
+  const form = h('form', { class: 'share-form', novalidate: true },
+    h('p', { class: 'sheet-text' }, last
+      ? `Shared with Trinity on ${formatWithYear(last)}. Trinity prays for a request for a month, so send it again to keep it on their list.`
+      : 'Sends this request to Trinity’s prayer list through the parish’s prayer request form.'),
+    share.el,
+    h('div', { class: 'sheet-actions' }, submit));
+  let sheet;
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (!share.check()) return;
+    share.remember();
+    const job = queueShare(store, { itemIds: [item.id], answers: share.answers() });
+    sheet.close();
+    toast('Sending to Trinity in a moment', { action: 'Undo', onAction: () => cancelShare(store, job) });
+    sendSharesSoon(app);
+  });
+  sheet = openSheet({ title: 'Share with Trinity', className: 'sheet-share', content: form });
+  return sheet;
+}
+
 /**
  * The main "add" sheet. Opens on the last list used, with that list's last
  * duration. Several lines add several entries.
@@ -218,6 +353,10 @@ export function openAddSheet(app, { text = '', listId = null, date = null, day: 
   const multiHint = h('p', { class: 'hint multi-hint', hidden: true });
   const schedule = h('div', { class: 'schedule' });
   const submit = h('button', { class: 'btn btn-primary btn-block', type: 'submit' }, 'Add');
+  const share = shareFields(app, { request: () => [textarea.value.trim(), note.value.trim()].filter(Boolean).join(' — ') });
+  share.el.hidden = !canShare(list);
+  share.onToggle = () => refresh();
+  note.addEventListener('input', () => share.follow());
 
   const entries = () => {
     const raw = textarea.value;
@@ -228,7 +367,8 @@ export function openAddSheet(app, { text = '', listId = null, date = null, day: 
   const refresh = () => {
     const n = entries().length;
     submit.disabled = n === 0;
-    submit.textContent = n > 1 ? `Add ${n}` : 'Add';
+    submit.textContent = `${n > 1 ? `Add ${n}` : 'Add'}${share.on && canShare(list) ? ' and share' : ''}`;
+    share.follow();
     multiHint.hidden = n < 2;
     multiHint.textContent = `${n} lines will be added as ${n} separate entries.`;
     if (list.type === 'weekly' && !dayTouched) {
@@ -282,6 +422,7 @@ export function openAddSheet(app, { text = '', listId = null, date = null, day: 
       day = null;
       dayTouched = false;
       monthDay = suggestMonthDay(list, start);
+      share.el.hidden = !canShare(list);
       renderSchedule();
       refresh();
     },
@@ -300,6 +441,7 @@ export function openAddSheet(app, { text = '', listId = null, date = null, day: 
     field('List', listPicker),
     schedule,
     noteBtn, noteField,
+    share.el,
     h('div', { class: 'sheet-actions' }, submit));
 
   let sheet;
@@ -307,6 +449,8 @@ export function openAddSheet(app, { text = '', listId = null, date = null, day: 
     e.preventDefault();
     const es = entries();
     if (!es.length) { textarea.focus(); return; }
+    const sharing = share.on && canShare(list);
+    if (sharing && !share.check()) return;
     const noteText = note.value.trim();
     let fields = {};
     if (list.type === 'daily') fields = { start, end: endDateFor(duration, start, until) };
@@ -318,13 +462,23 @@ export function openAddSheet(app, { text = '', listId = null, date = null, day: 
       s.meta.quickAddList = list.id;
       if (list.type === 'daily') s.meta.durations = { ...s.meta.durations, [list.id]: duration };
     }, { silent: true });
+    let job = null;
+    if (sharing && added.length) {
+      share.remember();
+      job = queueShare(store, { itemIds: added.map((i) => i.id), answers: share.answers() });
+    }
     requestPersistentStorage();
     sheet.close();
     const where = describeSchedule(list, added[0]);
-    toast(added.length === 1 ? `Added “${short(added[0].text, 32)}” to ${list.name}${where}` : `Added ${added.length} to ${list.name}${where}`, {
+    const what = added.length === 1 ? `Added “${short(added[0].text, 32)}” to ${list.name}${where}` : `Added ${added.length} to ${list.name}${where}`;
+    toast(job ? `${what}. Sharing with Trinity…` : what, {
       action: 'Undo',
-      onAction: () => { for (const i of added) store.deleteItem(i.id); },
+      onAction: () => {
+        if (job) cancelShare(store, job);
+        for (const i of added) store.deleteItem(i.id);
+      },
     });
+    if (job) sendSharesSoon(app);
   });
 
   renderSchedule();
@@ -420,6 +574,13 @@ export function openItemSheet(app, itemId, { list: inList = null, entry = null }
   const details = [];
   if (item.created) details.push(`Added ${formatWithYear(todayKey(new Date(item.created)))}`);
   if (item.start && list.type === 'daily') details.push(`first day ${formatMedium(item.start)}`);
+  const sharedOn = item.shared?.[TRINITY_FORM.id];
+  if (sharedOn) details.push(`shared with Trinity ${formatMedium(sharedOn)}`);
+  const shareBtn = canShare(list) && h('button', {
+    class: 'link-btn',
+    type: 'button',
+    onclick: () => { sheet.close(); openShareSheet(app, item.id); },
+  }, icon('upload'), sharedOn ? 'Share with Trinity again' : 'Share with Trinity');
 
   const save = h('button', { class: 'btn btn-primary', type: 'submit' }, 'Save');
   const del = h('button', { class: 'btn btn-danger', type: 'button' }, icon('trash'), 'Delete');
@@ -430,6 +591,7 @@ export function openItemSheet(app, itemId, { list: inList = null, entry = null }
     field('List', listSelect),
     schedule,
     details.length && h('p', { class: 'hint' }, details.join(' · ')),
+    shareBtn,
     h('div', { class: 'sheet-actions sheet-actions-split' }, del, save));
 
   let sheet;

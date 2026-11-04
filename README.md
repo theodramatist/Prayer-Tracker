@@ -47,6 +47,15 @@ You can rename, reorder, hide or delete any of these, and make more lists of any
   *Until…* a date. Paste several lines to add several people at once.
 - Tap a name to edit it: add details, change its day, set or remove an end date, move it
   to another list, or delete it.
+- **Share with Trinity:** when you add a prayer request (to *Prayer Requests* or another
+  daily list), turn on **Share with Trinity** and the parish's prayer request form comes
+  down: your name, the request (taken from what you typed; change the wording for
+  Trinity if you like), whether it's for someone who has died, and who it may be shared
+  with. Your name and sharing choice are remembered. **Add and share** puts it on your
+  list and, a few seconds later (so **Undo** can still stop it), sends it to the form. If
+  you're offline it waits on the device and goes when you're back online. The request
+  then shows when it was shared. Trinity prays for a request for a month, so for an
+  ongoing one, tap it and choose **Share with Trinity again**.
 - **Change a list's prayer:** open the list, tap **⋯**, and under Prayer choose another
   from the Prayer Book, change its words (say, to name your bishop in *For the Diocese*),
   write your own, or choose none.
@@ -248,6 +257,13 @@ Layout: `index.html`, `css/app.css`, and ES modules in `js/`:
 - `today.js`, `praythrough.js`, `lists.js`, `sheets.js` and `settings.js` are the screens.
 
 `sw.js` is the offline cache, and `manifest.webmanifest` makes the app installable.
+
+**Trinity's prayer request form** is set up in `js/share.js`: the form's address, the
+code Google gives each question's answer, and the sharing choices word for word. If the
+form changes, open it in Google Forms, choose **⋮ → Get pre-filled link**, fill in every
+question, and copy the `entry.…` codes from the link into that file. Google doesn't tell
+other sites whether it recorded a response, so the app counts a request as shared once it
+reaches Google; the share sheet also offers to open the form itself, filled in.
 
 **Releasing a change:** bump the version in both `js/version.js` and `sw.js`. Installed
 copies then fetch the new files and offer to reload. A unit test checks that the two

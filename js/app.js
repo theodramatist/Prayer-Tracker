@@ -11,6 +11,7 @@ import { renderLists, renderListDetail } from './lists.js';
 import { renderSettings } from './settings.js';
 import { openAddSheet } from './sheets.js';
 import { SEEDS } from './seeds.js';
+import { flushOutbox, pendingShares } from './share.js';
 
 const UI_KEY = 'prayer-tracker:ui';
 const root = document.documentElement;
@@ -152,6 +153,18 @@ const syncIfOn = () => { if (sync.enabled && !document.hidden) sync.sync(); };
 document.addEventListener('visibilitychange', syncIfOn);
 window.addEventListener('online', syncIfOn);
 setInterval(syncIfOn, 5 * 60 * 1000);
+
+// Prayer requests waiting to go to Trinity (shared while offline, say): sent
+// on opening, when the connection returns, and when the app comes back to the
+// front, but never while one can still be undone.
+const sendWaiting = async () => {
+  if (document.hidden || !pendingShares(store).length) return;
+  const { sent } = await flushOutbox(store, { minAge: app.shareDelay ?? 5000 });
+  if (sent) toast(sent === 1 ? 'Sent a waiting request to Trinity’s prayer list' : `Sent ${sent} waiting requests to Trinity’s prayer list`);
+};
+document.addEventListener('visibilitychange', sendWaiting);
+window.addEventListener('online', sendWaiting);
+setTimeout(sendWaiting, 3000);
 
 /** Midnight: move "today" forward (and the view with it, if it was showing today). */
 function checkRollover() {
