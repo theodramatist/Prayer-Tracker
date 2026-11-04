@@ -17,6 +17,8 @@ export const TRINITY_FORM = {
   id: 'trinity',
   name: 'Trinity',
   title: 'Trinity Prayer Requests',
+  // Who the requests come from, unless changed in Settings.
+  defaultName: 'Chris Corbin',
   send: `${FORM}/formResponse`,
   view: `${FORM}/viewform`,
   // The form's questions, by the codes Google gives their answers.
@@ -35,6 +37,17 @@ export const TRINITY_FORM = {
 };
 
 export const FORMS = { [TRINITY_FORM.id]: TRINITY_FORM };
+
+/** The name requests are sent under: yours from Settings, or the form's default. */
+export function shareName(store, form = TRINITY_FORM) {
+  return String(store.state.settings.share?.[form.id]?.name || '').trim() || form.defaultName;
+}
+
+/** The sharing choice used last time, or else the most private one. */
+export function sharingChoice(store, form = TRINITY_FORM) {
+  const saved = store.state.settings.share?.[form.id]?.sharing;
+  return form.sharing.includes(saved) ? saved : form.sharing[0];
+}
 
 /** The answers as the form posts them. */
 export function formFields(form, answers) {

@@ -823,7 +823,7 @@ await step('sync: refuses a bad token, connects to a private repository, and pic
   await eventually(async () => assert.ok((ghDoc().checks['2026-11-03'] || {})['from-ipad'] > 0), 6000);
 });
 
-async function addSharing(text, { name = null, choice = null } = {}) {
+async function addSharing(text, { choice = null } = {}) {
   await page.click('.tab-add');
   const sheet = page.locator('.sheet-add');
   await sheet.waitFor();
@@ -831,30 +831,29 @@ async function addSharing(text, { name = null, choice = null } = {}) {
   await sheet.locator('.chips-lists .chip', { hasText: 'Prayer Requests' }).click();
   await sheet.locator('.share .toggle-row label').click();
   await sheet.locator('.share-body').waitFor();
-  if (name != null) await sheet.locator('.share-body input[aria-label^="Your name"]').fill(name);
   if (choice) await sheet.locator('.radio-row', { hasText: choice }).click();
   return sheet;
 }
 
-await step('share a prayer request with Trinity: the form’s questions come down, and it goes a moment later', async () => {
+await step('share a prayer request with Trinity: your name and the request go as they are; the other two questions come down', async () => {
   await page.evaluate(() => { window.prayerTracker.shareDelay = 400; });
   await page.click('.tab-add');
   const sheet = page.locator('.sheet-add');
   await sheet.waitFor();
   await sheet.locator('textarea.add-text').fill('Jane Roe – surgery Friday');
   await sheet.locator('.chips-lists .chip', { hasText: 'Prayer Requests' }).click();
+  await sheet.locator('.link-btn', { hasText: 'Add details' }).click();
+  await sheet.locator('textarea[aria-label="Details"]').fill('a private detail');
   assert.equal(await sheet.locator('.share-body').isVisible(), false);
   await sheet.locator('.share .toggle-row label').click();
   await sheet.locator('.share-body').waitFor();
-  assert.equal(await sheet.locator('.share-body textarea').inputValue(), 'Jane Roe – surgery Friday');
+  assert.match(await sheet.locator('.share-from').innerText(), /^From Chris Corbin, with the request as you wrote it above\. Details stay private\./);
+  assert.equal(await sheet.locator('.share-body input:not([type=radio]), .share-body textarea').count(), 0); // nothing to type
   assert.deepEqual(await texts('.sheet-add .radio-row'), [
     'Only share my name and prayer request with clergy and staff.',
     'Share my prayer request with members of the congregation, but keep my name anonymous.',
     'Share my prayer request and name with members of the congregation.']);
-  // The form needs a name.
-  await sheet.locator('button[type=submit]').click();
-  assert.match(await sheet.locator('.share-error').innerText(), /needs your name/);
-  await sheet.locator('.share-body input[aria-label^="Your name"]').fill('Pat Example');
+  assert.ok(await sheet.locator('.radio-row').first().locator('input').isChecked()); // the most private, to begin with
   await sheet.locator('.radio-row', { hasText: 'keep my name anonymous' }).click();
   assert.equal(await sheet.locator('button[type=submit]').innerText(), 'Add and share');
   await shot('32b-share-with-trinity');
@@ -864,12 +863,12 @@ await step('share a prayer request with Trinity: the form’s questions come dow
   assert.equal(formPosts[0].method, 'POST');
   assert.equal(formPosts[0].url, 'https://docs.google.com/forms/d/e/1FAIpQLSceBPekpqOMedX0hZYr27AjsuaDFwjs0W_eftoAQvaK197Q3Q/formResponse');
   assert.deepEqual(Object.fromEntries(formPosts[0].body), {
-    'entry.597871476': 'Pat Example',
+    'entry.597871476': 'Chris Corbin',
     'entry.670633233': 'Jane Roe – surgery Friday',
     'entry.764039509': 'No',
     'entry.1294983933': 'Share my prayer request with members of the congregation, but keep my name anonymous.',
   });
-  await eventually(async () => assert.match(await page.locator('.toast.show').innerText(), /Sent to Trinity’s prayer list/));
+  await eventually(async () => assert.match(await page.locator('.toast.show').innerText({ timeout: 1000 }), /Sent to Trinity’s prayer list/));
   // On your own list it's marked shared, and can be sent again (Trinity keeps a request a month).
   await page.locator('.item', { hasText: 'Jane Roe' }).locator('.item-body').click();
   const edit = page.locator('.sheet-item');
@@ -878,15 +877,15 @@ await step('share a prayer request with Trinity: the form’s questions come dow
   await edit.locator('.link-btn', { hasText: 'Share with Trinity again' }).click();
   const again = page.locator('.sheet-share');
   await again.waitFor();
-  assert.equal(await again.locator('input[aria-label^="Your name"]').inputValue(), 'Pat Example'); // remembered
-  assert.ok(await again.locator('.radio-row', { hasText: 'keep my name anonymous' }).locator('input').isChecked());
+  assert.equal(await again.locator('.share-preview').innerText(), 'Jane Roe – surgery Friday');
+  assert.ok(await again.locator('.radio-row', { hasText: 'keep my name anonymous' }).locator('input').isChecked()); // remembered
   assert.match(await again.locator('.share-open').getAttribute('href') || '', /viewform/);
   await shot('32c-share-again');
   await again.locator('.sheet-close').click();
   await again.waitFor({ state: 'detached' });
 });
 
-await step('a share can be undone before it goes, and waits while offline', async () => {
+await step('a share can be undone before it goes, waits while offline, and sends each line as its own request', async () => {
   await page.evaluate(() => { window.prayerTracker.shareDelay = 2500; });
   let sheet = await addSharing('Undo me');
   await sheet.locator('button[type=submit]').click();
@@ -909,6 +908,30 @@ await step('a share can be undone before it goes, and waits while offline', asyn
   await page.evaluate(() => { window.prayerTracker.shareDelay = 0; window.dispatchEvent(new Event('online')); });
   await eventually(async () => assert.equal(formPosts.length, 2), 8000);
   assert.equal(formPosts[1].body.get('entry.670633233'), 'Bob Doe – new job');
+
+  await page.evaluate(() => { window.prayerTracker.shareDelay = 400; });
+  sheet = await addSharing('Ann Fox – travelling\nBen Fox – exams');
+  assert.equal(await sheet.locator('button[type=submit]').innerText(), 'Add 2 and share');
+  await sheet.locator('button[type=submit]').click();
+  await sheet.waitFor({ state: 'detached' });
+  await eventually(async () => assert.equal(formPosts.length, 4), 6000);
+  assert.deepEqual(formPosts.slice(2).map((p) => p.body.get('entry.670633233')).sort(), ['Ann Fox – travelling', 'Ben Fox – exams']);
+});
+
+await step('the name requests go under can be changed in Settings', async () => {
+  await page.click('.tabbar a[href="#/lists"]');
+  await page.click('a[href="#/settings"]');
+  const card = page.locator('.settings-card', { hasText: 'Sharing with Trinity' });
+  assert.equal(await card.locator('input').inputValue(), 'Chris Corbin');
+  await card.locator('input').fill('Pat Example');
+  await card.locator('input').press('Tab');
+  await goToday();
+  const sheet = await addSharing('Cy Coe – thanksgiving for a new grandchild');
+  assert.match(await sheet.locator('.share-from').innerText(), /^From Pat Example/);
+  await sheet.locator('button[type=submit]').click();
+  await sheet.waitFor({ state: 'detached' });
+  await eventually(async () => assert.equal(formPosts.length, 5), 6000);
+  assert.equal(formPosts[4].body.get('entry.597871476'), 'Pat Example');
 });
 
 await step('colours: burgundy on ivory unless blue or the church year is chosen', async () => {

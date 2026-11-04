@@ -48,14 +48,15 @@ You can rename, reorder, hide or delete any of these, and make more lists of any
 - Tap a name to edit it: add details, change its day, set or remove an end date, move it
   to another list, or delete it.
 - **Share with Trinity:** when you add a prayer request (to *Prayer Requests* or another
-  daily list), turn on **Share with Trinity** and the parish's prayer request form comes
-  down: your name, the request (taken from what you typed; change the wording for
-  Trinity if you like), whether it's for someone who has died, and who it may be shared
-  with. Your name and sharing choice are remembered. **Add and share** puts it on your
-  list and, a few seconds later (so **Undo** can still stop it), sends it to the form. If
-  you're offline it waits on the device and goes when you're back online. The request
-  then shows when it was shared. Trinity prays for a request for a month, so for an
-  ongoing one, tap it and choose **Share with Trinity again**.
+  daily list), turn on **Share with Trinity**. The request goes to the parish's prayer
+  request form exactly as you wrote it, under your name (*Chris Corbin*; change it in
+  **Settings → Sharing with Trinity**). Details you add stay private. Only the form's
+  other two questions come down: whether it's for someone who has died, and who it may
+  be shared with (your last choice is remembered). **Add and share** puts it on your list
+  and, a few seconds later (so **Undo** can still stop it), sends it; several lines go as
+  several requests. If you're offline it waits on the device and goes when you're back
+  online. The request then shows when it was shared. Trinity prays for a request for a
+  month, so for an ongoing one, tap it and choose **Share with Trinity again**.
 - **Change a list's prayer:** open the list, tap **⋯**, and under Prayer choose another
   from the Prayer Book, change its words (say, to name your bishop in *For the Diocese*),
   write your own, or choose none.

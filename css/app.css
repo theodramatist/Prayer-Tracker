@@ -637,7 +637,16 @@ code { font: 0.92em/1 ui-monospace, "SF Mono", Menlo, monospace; padding: 1px 5p
 }
 .radio-row input { flex: none; width: 18px; height: 18px; margin: 1px 0 0; accent-color: var(--accent); }
 .radio-row:has(input:checked) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
-.share-body .share-error { color: var(--danger); font-weight: 600; }
+.share-preview {
+  margin: 10px 0 0;
+  padding: 8px 12px;
+  border-left: 3px solid var(--accent);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: var(--surface);
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 16.5px;
+}
 .share-open { margin-top: 2px; }
 
 /* "Prayed for all": a list read out in one go. */

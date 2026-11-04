@@ -6,7 +6,7 @@ import { DURATIONS, endDateFor, sortItems, nameOf, planSpread, LIST_TYPES, SORTS
 import { PRAYERS, SOURCE as PRAYER_SOURCE, prayerFor } from './prayers.js';
 import { bundleFor } from './bundles.js';
 import { seedFor } from './seeds.js';
-import { TRINITY_FORM, prefilledUrl, missingAnswers, queueShare, cancelShare, flushOutbox } from './share.js';
+import { TRINITY_FORM, prefilledUrl, queueShare, cancelShare, flushOutbox, shareName, sharingChoice } from './share.js';
 import { parseList, parseWeekly, parseMonthly, parseDated } from './importer.js';
 import { parseName, compareNames } from './names.js';
 import { WEEKDAYS, WEEKDAYS_SHORT, addDays, diffDays, formatShort, formatMedium, formatWithYear, weekday, parseKey, isValidKey, todayKey } from './dates.js';
@@ -181,37 +181,27 @@ const TYPE_ORDER = ['daily', 'weekly', 'monthly', 'dated'];
 export const canShare = (list) => list?.type === 'daily';
 
 /**
- * The questions on Trinity's prayer request form, with a "Share with Trinity"
- * switch above them (unless `fixed`). Your name and sharing choice are
- * remembered for next time. `request()` gives the text to start from; it
- * follows what you type in the entry until you change it here.
+ * Trinity's prayer request form, under a "Share with Trinity" switch (unless
+ * `fixed`). Your name comes from Settings and the request is the entry as you
+ * wrote it, so only the form's other two questions are asked here. The
+ * sharing choice is remembered for next time.
  */
-function shareFields(app, { request: from = () => '', fixed = false } = {}) {
+function shareFields(app, { fixed = false, preview = null } = {}) {
   const { store } = app;
   const form = TRINITY_FORM;
-  const saved = store.state.settings.share?.[form.id] || {};
   let on = fixed;
   let died = false;
-  let sharing = form.sharing.includes(saved.sharing) ? saved.sharing : form.sharing[0];
-  let edited = false;
+  let sharing = sharingChoice(store);
   const group = `share-${Math.random().toString(36).slice(2, 8)}`;
-
-  const name = h('input', { class: 'input', value: saved.name || '', placeholder: 'First and last name', autocomplete: 'name', autocapitalize: 'words', 'aria-label': 'Your name, first and last' });
-  const request = h('textarea', { class: 'input', rows: 3, 'aria-label': 'How can we pray for you?' });
-  request.value = from();
-  request.addEventListener('input', () => { edited = true; });
-  const error = h('p', { class: 'hint share-error', hidden: true });
-  for (const input of [name, request]) input.addEventListener('input', () => { error.hidden = true; });
   const choices = h('div', { class: 'radio-list', role: 'radiogroup', 'aria-label': 'Who would you like your prayer request shared with?' },
     form.sharing.map((choice) => h('label', { class: 'radio-row' },
       h('input', { type: 'radio', name: group, value: choice, checked: choice === sharing, onchange: () => { sharing = choice; } }),
       h('span', null, choice))));
-  const answers = () => ({ name: name.value, request: request.value, died, sharing });
+  const answers = (request) => ({ name: shareName(store), request, died, sharing });
 
   const body = h('div', { class: 'share-body', hidden: !on },
-    !fixed && h('p', { class: 'hint' }, 'Also sent to Trinity’s prayer request form, a few seconds after you add it.'),
-    field('What’s your name (first and last)?', name),
-    field('How can we pray for you?', request, h('p', { class: 'hint' }, 'If it’s for someone else, include their name.')),
+    h('p', { class: 'hint share-from' }, `From ${shareName(store)}, with the request as you wrote it${fixed ? '' : ' above'}. Details stay private.`),
+    preview && h('blockquote', { class: 'share-preview' }, preview),
     field('Is this a prayer request for someone who has died?', chipGroup({
       label: 'Is this a prayer request for someone who has died?',
       value: 'no',
@@ -219,54 +209,37 @@ function shareFields(app, { request: from = () => '', fixed = false } = {}) {
       onChange: (v) => { died = v === 'yes'; },
     })),
     field('Who would you like your prayer request shared with?', choices),
-    h('p', { class: 'hint' }, 'Trinity prays for a request for one month. For an ongoing one, share it again each month: tap it, then Share with Trinity.'),
-    error,
-    fixed && h('a', {
+    h('p', { class: 'hint' }, 'Trinity prays for a request for one month. For an ongoing one, share it again each month: tap it, then Share with Trinity again.'),
+    fixed && preview && h('a', {
       class: 'link-btn share-open',
       href: form.view,
       target: '_blank',
       rel: 'noopener',
-      onclick: (e) => { e.currentTarget.href = prefilledUrl(form, answers()); },
+      onclick: (e) => { e.currentTarget.href = prefilledUrl(form, answers(preview)); },
     }, icon('link'), 'Or open the form itself, filled in'));
 
+  let onToggle = null;
   const toggleRow = !fixed && toggle({
     label: 'Share with Trinity',
-    hint: 'Send this request to Trinity’s prayer list too.',
+    hint: 'Also send this request to Trinity’s prayer list.',
     checked: false,
     onChange: (v) => {
       on = v;
       body.hidden = !v;
-      if (v && !edited) request.value = from();
-      if (v && !name.value.trim()) name.focus();
       onToggle?.(v);
     },
   });
-  let onToggle = null;
 
   return {
     el: h('div', { class: 'share' }, toggleRow, body),
     get on() { return on; },
     set onToggle(fn) { onToggle = fn; },
-    /** Keep the request in step with the entry being typed. */
-    follow() { if (!edited) request.value = from(); },
+    /** The form's answers for one request. */
     answers,
-    /** True when everything the form needs is filled in; otherwise says what's missing. */
-    check() {
-      const missing = missingAnswers(form, answers());
-      if (!missing.length) { error.hidden = true; return true; }
-      error.hidden = false;
-      error.textContent = missing.includes('name') ? 'Trinity’s form needs your name.' : 'Say how Trinity can pray.';
-      (missing.includes('name') ? name : request).focus();
-      return false;
-    },
-    /** Remember your name and sharing choice for next time. */
+    /** Remember the sharing choice for next time. */
     remember() {
-      const a = answers();
-      const next = { name: a.name.trim(), sharing: a.sharing };
       const prev = store.state.settings.share?.[form.id] || {};
-      if (prev.name !== next.name || prev.sharing !== next.sharing) {
-        store.setSetting('share', { ...(store.state.settings.share || {}), [form.id]: next });
-      }
+      if (prev.sharing !== sharing) store.setSetting('share', { ...(store.state.settings.share || {}), [form.id]: { ...prev, sharing } });
     },
   };
 }
@@ -286,7 +259,7 @@ export function openShareSheet(app, itemId) {
   const found = store.findItem(itemId);
   if (!found) return null;
   const { item } = found;
-  const share = shareFields(app, { request: () => [item.text, item.note].filter(Boolean).join(' — '), fixed: true });
+  const share = shareFields(app, { fixed: true, preview: item.text });
   const last = item.shared?.[TRINITY_FORM.id];
   const submit = h('button', { class: 'btn btn-primary btn-block', type: 'submit' }, last ? 'Send to Trinity again' : 'Send to Trinity');
   const form = h('form', { class: 'share-form', novalidate: true },
@@ -298,9 +271,8 @@ export function openShareSheet(app, itemId) {
   let sheet;
   form.addEventListener('submit', (e) => {
     e.preventDefault();
-    if (!share.check()) return;
     share.remember();
-    const job = queueShare(store, { itemIds: [item.id], answers: share.answers() });
+    const job = queueShare(store, { itemIds: [item.id], answers: share.answers(item.text) });
     sheet.close();
     toast('Sending to Trinity in a moment', { action: 'Undo', onAction: () => cancelShare(store, job) });
     sendSharesSoon(app);
@@ -353,10 +325,9 @@ export function openAddSheet(app, { text = '', listId = null, date = null, day: 
   const multiHint = h('p', { class: 'hint multi-hint', hidden: true });
   const schedule = h('div', { class: 'schedule' });
   const submit = h('button', { class: 'btn btn-primary btn-block', type: 'submit' }, 'Add');
-  const share = shareFields(app, { request: () => [textarea.value.trim(), note.value.trim()].filter(Boolean).join(' — ') });
+  const share = shareFields(app);
   share.el.hidden = !canShare(list);
   share.onToggle = () => refresh();
-  note.addEventListener('input', () => share.follow());
 
   const entries = () => {
     const raw = textarea.value;
@@ -368,7 +339,6 @@ export function openAddSheet(app, { text = '', listId = null, date = null, day: 
     const n = entries().length;
     submit.disabled = n === 0;
     submit.textContent = `${n > 1 ? `Add ${n}` : 'Add'}${share.on && canShare(list) ? ' and share' : ''}`;
-    share.follow();
     multiHint.hidden = n < 2;
     multiHint.textContent = `${n} lines will be added as ${n} separate entries.`;
     if (list.type === 'weekly' && !dayTouched) {
@@ -450,7 +420,6 @@ export function openAddSheet(app, { text = '', listId = null, date = null, day: 
     const es = entries();
     if (!es.length) { textarea.focus(); return; }
     const sharing = share.on && canShare(list);
-    if (sharing && !share.check()) return;
     const noteText = note.value.trim();
     let fields = {};
     if (list.type === 'daily') fields = { start, end: endDateFor(duration, start, until) };
@@ -462,23 +431,24 @@ export function openAddSheet(app, { text = '', listId = null, date = null, day: 
       s.meta.quickAddList = list.id;
       if (list.type === 'daily') s.meta.durations = { ...s.meta.durations, [list.id]: duration };
     }, { silent: true });
-    let job = null;
+    // Each request goes to Trinity as its own response, worded as you wrote it.
+    const jobs = [];
     if (sharing && added.length) {
       share.remember();
-      job = queueShare(store, { itemIds: added.map((i) => i.id), answers: share.answers() });
+      for (const i of added) jobs.push(queueShare(store, { itemIds: [i.id], answers: share.answers(i.text) }));
     }
     requestPersistentStorage();
     sheet.close();
     const where = describeSchedule(list, added[0]);
     const what = added.length === 1 ? `Added “${short(added[0].text, 32)}” to ${list.name}${where}` : `Added ${added.length} to ${list.name}${where}`;
-    toast(job ? `${what}. Sharing with Trinity…` : what, {
+    toast(jobs.length ? `${what}. Sharing with Trinity…` : what, {
       action: 'Undo',
       onAction: () => {
-        if (job) cancelShare(store, job);
+        for (const job of jobs) cancelShare(store, job);
         for (const i of added) store.deleteItem(i.id);
       },
     });
-    if (job) sendSharesSoon(app);
+    if (jobs.length) sendSharesSoon(app);
   });
 
   renderSchedule();

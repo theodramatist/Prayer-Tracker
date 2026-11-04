@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { Store } from '../../js/store.js';
-import { TRINITY_FORM, formFields, prefilledUrl, missingAnswers, queueShare, cancelShare, flushOutbox, pendingShares } from '../../js/share.js';
+import { TRINITY_FORM, formFields, prefilledUrl, missingAnswers, queueShare, cancelShare, flushOutbox, pendingShares, shareName, sharingChoice } from '../../js/share.js';
 
 function memoryStorage(initial = {}) {
   const data = { ...initial };
@@ -97,4 +97,16 @@ test('offline, a request keeps waiting; Undo and deleted entries stop it going',
   assert.deepEqual(await flushOutbox(again, { fetchImpl: fetch }), { sent: 1, waiting: 0 });
   assert.deepEqual(fetch.calls.map((x) => x.body.get('entry.670633233')), ['A']);
   assert.deepEqual(again.list('requests').items.find((i) => i.text === 'A').shared, { trinity: '2026-11-04' });
+});
+
+test('requests go under Chris Corbin unless another name is set, and start on the most private sharing choice', () => {
+  const store = new Store(memoryStorage());
+  assert.equal(shareName(store), 'Chris Corbin');
+  assert.equal(sharingChoice(store), 'Only share my name and prayer request with clergy and staff.');
+  store.setSetting('share', { trinity: { name: ' Pat Example ', sharing: TRINITY_FORM.sharing[2] } });
+  assert.equal(shareName(store), 'Pat Example');
+  assert.equal(sharingChoice(store), 'Share my prayer request and name with members of the congregation.');
+  store.setSetting('share', { trinity: { name: '', sharing: 'Something the form no longer has' } });
+  assert.equal(shareName(store), 'Chris Corbin');
+  assert.equal(sharingChoice(store), TRINITY_FORM.sharing[0]);
 });

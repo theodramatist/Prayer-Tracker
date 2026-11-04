@@ -5,6 +5,7 @@ import { todayKey, formatWithYear } from './dates.js';
 import { dayTitle } from './calendar.js';
 import { VERSION } from './version.js';
 import { SEEDS } from './seeds.js';
+import { TRINITY_FORM, shareName, pendingShares } from './share.js';
 
 const field = (label, ...children) => h('div', { class: 'field' }, h('span', { class: 'field-label' }, label), children);
 const card = (title, ...children) => h('section', { class: 'settings-card' }, h('h2', null, title), children);
@@ -77,6 +78,30 @@ function ago(ms) {
   const hours = Math.round(mins / 60);
   if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
   return formatWithYear(todayKey(new Date(ms)));
+}
+
+/** Sharing requests with Trinity: the name they're sent under. */
+function shareCard(app) {
+  const { store } = app;
+  const form = TRINITY_FORM;
+  const waiting = pendingShares(store).length;
+  const name = h('input', {
+    class: 'input',
+    value: shareName(store),
+    autocomplete: 'name',
+    autocapitalize: 'words',
+    'aria-label': 'Your name on Trinity’s form',
+    onchange: (e) => {
+      const value = e.target.value.trim() || form.defaultName;
+      e.target.value = value;
+      const prev = store.state.settings.share?.[form.id] || {};
+      if (value !== shareName(store)) store.setSetting('share', { ...(store.state.settings.share || {}), [form.id]: { ...prev, name: value } });
+    },
+  });
+  return card('Sharing with Trinity',
+    h('p', null, 'Prayer requests you share with Trinity go to its prayer request form under this name, worded as you wrote them.'),
+    field('Your name (first and last)', name),
+    waiting > 0 && h('p', { class: 'hint' }, `${waiting === 1 ? 'One request is' : `${waiting} requests are`} waiting to go, and will be sent when there’s a connection.`));
 }
 
 function syncCard(app) {
@@ -193,6 +218,8 @@ export function renderSettings(app) {
         checked: s.showPrayers !== false,
         onChange: (v) => store.setSetting('showPrayers', v),
       })),
+
+    shareCard(app),
 
     syncCard(app),
 
