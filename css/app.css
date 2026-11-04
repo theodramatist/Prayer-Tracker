@@ -649,6 +649,72 @@ code { font: 0.92em/1 ui-monospace, "SF Mono", Menlo, monospace; padding: 1px 5p
 }
 .share-open { margin-top: 2px; }
 
+/* Prayers: paragraphs, and the people's responses and rubrics in italics. */
+.prayer + .prayer { margin-top: -4px; }
+.prayer-text p + p, .pray-prayer-text p + p { margin-top: .55em; }
+.prayer-response { color: var(--text-2); }
+.prayer-read { font-size: 17.5px; }
+.item-note.item-prayer {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  white-space: normal;
+}
+
+/* The prayers a list opens with, in its settings. */
+.prayer-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.prayer-row {
+  padding: 8px 10px 4px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.prayer-row-head { display: flex; align-items: center; gap: 8px; }
+.prayer-row-title { flex: 1; min-width: 0; font-family: var(--font-serif); font-size: 16.5px; }
+.prayer-row-tools { display: flex; gap: 2px; }
+.prayer-row-tools .icon-btn { width: 36px; height: 36px; }
+.prayer-row .link-btn { font-size: 14px; }
+.prayer-add { display: grid; gap: 6px; margin-top: 10px; }
+
+/* Choosing prayers and thanksgivings: folded headings, a search, checkboxes. */
+.picker .search { margin-bottom: 8px; }
+.picker-count { margin: 0 2px 10px; }
+.picker-sections { display: grid; gap: 8px; }
+.picker-section {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.picker-own { margin-top: 8px; }
+.picker-section > summary {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  padding: 12px 14px;
+  cursor: pointer;
+  list-style: none;
+}
+.picker-section > summary::-webkit-details-marker { display: none; }
+.picker-heading { font-family: var(--font-serif); font-size: 17px; font-weight: 520; }
+.picker-chosen { color: var(--accent); font-size: 13px; font-weight: 650; white-space: nowrap; }
+.picker-list { list-style: none; margin: 0; padding: 0 12px 6px; }
+.picker-row { padding: 8px 0; border-top: 1px solid var(--line); }
+.picker-check { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
+.picker-check input { flex: none; width: 20px; height: 20px; margin: 1px 0 0; accent-color: var(--accent); }
+.picker-title { font-size: 16px; line-height: 1.35; }
+.picker-words { margin: 4px 0 0 30px; }
+.picker-words > summary {
+  color: var(--text-3);
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 14.5px;
+  cursor: pointer;
+  list-style: none;
+}
+.picker-words > summary::-webkit-details-marker { display: none; }
+.picker-words[open] > summary { display: none; }
+.picker-words .prayer-text { font-size: 15.5px; }
+.picker-own .prayer-edit { padding: 0 12px 12px; }
+
 /* "Prayed for all": a list read out in one go. */
 .group-foot { display: flex; justify-content: flex-end; padding: 2px 4px 0; }
 .group-foot .link-btn { font-size: 14px; }

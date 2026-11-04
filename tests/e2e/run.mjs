@@ -542,7 +542,7 @@ await step('all prayed shows a closing response', async () => {
 
 await step('Lists and Settings screens render', async () => {
   await page.click('.tabbar a[href="#/lists"]');
-  assert.deepEqual(await texts('.lc-name'), ['Anglican Cycle of Prayer', 'Diocesan Cycle', 'Diocesan Daily Cycle', 'Trinity', 'Prayer Requests', 'Family', 'Clergy']);
+  assert.deepEqual(await texts('.lc-name'), ['Anglican Cycle of Prayer', 'Diocesan Cycle', 'Diocesan Daily Cycle', 'Trinity', 'Prayer Requests', 'Family', 'Clergy', 'Prayers and Thanksgivings']);
   await shot('10-lists');
   await page.click('a[href="#/settings"]');
   await page.locator('.page-title').waitFor();
@@ -711,17 +711,22 @@ await step('a built-in entry can be reworded (say, after a merger) and restored'
   assert.deepEqual(await texts('.group[data-list=anglican] .item-text'), ['The Diocese of Delta (Example)']);
 });
 
-await step('a list’s prayer can be changed to another, or to your own words', async () => {
+await step('a list’s prayers can be changed: others added from the Prayer Book, reordered, reworded, or removed', async () => {
   await quickAdd('Mom', { list: 'Family' });
   assert.equal(await page.locator('.group[data-list=family] .prayer-title').innerText(), 'FOR THOSE WE LOVE');
   await openList('family');
   await page.locator('button[aria-label="List settings"]').click();
   const sheet = page.locator('.sheet-list');
   await sheet.waitFor();
-  await sheet.locator('select').selectOption('absent');
-  assert.match(await sheet.locator('textarea').inputValue(), /^O God, whose fatherly care reacheth/);
+  assert.deepEqual(await texts('.sheet-list .prayer-row-title'), ['For those we Love']);
+  await sheet.locator('select[aria-label="Add a prayer from the Prayer Book"]').selectOption('p52');
+  assert.deepEqual(await texts('.sheet-list .prayer-row-title'), ['For those we Love', 'For the Absent']);
+  await sheet.locator('button[aria-label="Move “For the Absent” up"]').click();
+  assert.deepEqual(await texts('.sheet-list .prayer-row-title'), ['For the Absent', 'For those we Love']);
+  await sheet.locator('button[aria-label="Remove “For the Absent”"]').click();
+  await sheet.locator('.prayer-row .link-btn', { hasText: 'Change the words' }).click();
   await sheet.locator('.prayer-edit input').fill('For my family');
-  await sheet.locator('textarea').fill('Lord, keep those I love in your care, near and far. Amen.');
+  await sheet.locator('.prayer-edit textarea').fill('Lord, keep those I love in your care, near and far. Amen.');
   await shot('23-prayer-editor');
   await sheet.locator('button[type=submit]').click();
   await sheet.waitFor({ state: 'detached' });
@@ -932,6 +937,78 @@ await step('the name requests go under can be changed in Settings', async () => 
   await sheet.waitFor({ state: 'detached' });
   await eventually(async () => assert.equal(formPosts.length, 5), 6000);
   assert.equal(formPosts[4].body.get('entry.597871476'), 'Pat Example');
+});
+
+await step('Prayer Requests opens with the Vigil prayer, then All Sorts and Conditions', async () => {
+  await goToday();
+  assert.deepEqual(await texts('.group[data-list=requests] .prayer-title'), ['FROM THE GREAT VIGIL OF EASTER', 'FOR ALL SORTS AND CONDITIONS OF MEN']);
+  await page.locator('.group[data-list=requests] .prayer summary').first().click();
+  assert.match(await page.locator('.group[data-list=requests] .prayer-text').first().innerText(), /^God and Father of all believers, for the glory of your Name multiply/);
+  await page.locator('.group[data-list=requests] .prayer summary').first().click();
+});
+
+await step('Prayers and Thanksgivings: choose from folded headings or by searching, in Rite One or Rite Two', async () => {
+  await page.click('.tabbar a[href="#/lists"]');
+  await page.click('a[href="#/settings"]');
+  assert.equal(await page.locator('.chips-rite .chip.on').innerText(), 'Rite Two');
+  await page.locator('button', { hasText: 'Choose prayers and thanksgivings' }).click();
+  const picker = page.locator('.sheet-picker');
+  await picker.waitFor();
+  assert.match(await picker.locator('.picker-count').innerText(), /Nothing chosen yet/);
+  assert.equal(await picker.locator('.picker-section[open]').count(), 0); // all folded
+  assert.equal(await picker.locator('.picker-section > summary').first().innerText(), 'Prayers for the World');
+  // Search by the prayer's own words.
+  await picker.locator('input[type=search]').fill('quietness and in confidence');
+  await eventually(async () => assert.deepEqual(await texts('.sheet-picker .picker-row:not([hidden]) .picker-title'), ['59. For Quiet Confidence']));
+  await picker.locator('.picker-row:not([hidden]) input[type=checkbox]').check();
+  assert.match(await picker.locator('.picker-count').innerText(), /^1 prayer chosen/);
+  await picker.locator('input[type=search]').fill('');
+  // Or open a heading.
+  const general = picker.locator('.picker-section', { hasText: 'General Thanksgivings' });
+  await general.locator('summary').first().click();
+  await general.locator('.picker-row', { hasText: 'A General Thanksgiving' }).locator('input[type=checkbox]').check();
+  assert.equal(await general.locator('.picker-chosen').innerText(), '1 chosen');
+  await shot('33-prayer-picker');
+  await picker.locator('button', { hasText: 'Done' }).click();
+  await picker.waitFor({ state: 'detached' });
+  await goToday();
+  assert.deepEqual(await texts('.group[data-list=prayers] .item-text'), ['For Quiet Confidence', 'A General Thanksgiving']);
+  assert.match(await page.locator('.group[data-list=prayers] .item-prayer').first().innerText(), /^O God of peace, you have taught us/);
+  // Rite One: the same prayer in traditional language.
+  await page.click('.tabbar a[href="#/lists"]');
+  await page.click('a[href="#/settings"]');
+  await page.locator('.chips-rite .chip', { hasText: 'Rite One' }).click();
+  await goToday();
+  assert.match(await page.locator('.group[data-list=prayers] .item-prayer').first().innerText(), /^O God of peace, who hast taught us/);
+  // Read one in full.
+  await page.locator('.group[data-list=prayers] .item', { hasText: 'For Quiet Confidence' }).locator('.item-body').click();
+  const read = page.locator('.sheet-prayer');
+  await read.waitFor();
+  assert.match(await read.innerText(), /know that thou art God; through Jesus Christ our Lord\. Amen\.[\s\S]*The Book of Common Prayer, page 832/);
+  await shot('34-prayer-read');
+  await read.locator('button', { hasText: 'Done' }).click();
+  await read.waitFor({ state: 'detached' });
+});
+
+await step('your chosen prayers are said one by one in pray-through, and checked off', async () => {
+  await page.locator('.btn-pray').click();
+  const pray = page.locator('dialog.pray');
+  await pray.waitFor();
+  for (let k = 0; k < 20 && (await pray.locator('.pray-prayer-title').innerText().catch(() => '')) !== 'For Quiet Confidence'; k++) {
+    await pray.locator('button', { hasText: 'Skip' }).or(pray.locator('.btn-amen')).first().click();
+  }
+  assert.equal(await pray.locator('.pray-prayer-title').innerText(), 'For Quiet Confidence');
+  assert.match(await pray.locator('.pray-prayer-text').innerText(), /^O God of peace, who hast taught us/);
+  await sleep(450);
+  await shot('35-pray-prayer-item');
+  await pray.locator('.btn-amen').click();
+  await pray.locator('button[aria-label="Close"]').click();
+  await pray.waitFor({ state: 'detached' });
+  await eventually(async () => assert.deepEqual(await texts('.group[data-list=prayers] .items:not(.items-done) .item-text'), ['A General Thanksgiving']));
+  await page.click('.tabbar a[href="#/lists"]');
+  await page.click('a[href="#/settings"]');
+  await page.locator('.chips-rite .chip', { hasText: 'Rite Two' }).click();
+  await goToday();
 });
 
 await step('colours: burgundy on ivory unless blue or the church year is chosen', async () => {

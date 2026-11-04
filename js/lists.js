@@ -5,8 +5,9 @@ import { h, icon, toast, plural } from './ui.js';
 import { LIST_TYPES, SORTS, sortItems, partitionByStatus, endLabel, datedRange, cycleSource, itemsDue, builtinEntries } from './schedule.js';
 import { WEEKDAYS, MONTHS, addDays, formatMedium, formatWithYear, formatShort, parseKey } from './dates.js';
 import { editionById } from './bundles.js';
-import { openAddSheet, openItemSheet, openImportSheet, openListSheet, openDistributeSheet, loadSeed, ACP_URL } from './sheets.js';
+import { openAddSheet, openItemSheet, openImportSheet, openListSheet, openDistributeSheet, openPrayerPicker, loadSeed, ACP_URL } from './sheets.js';
 import { seedFor } from './seeds.js';
+import { itemPrayer, isPrayerItem, firstWords, DEFAULT_RITE } from './prayers.js';
 
 function summary(list, today) {
   const n = list.items.length;
@@ -76,12 +77,14 @@ export function renderLists(app) {
 
 function row(app, item, { key, today, list = null, badge: extra = null } = {}) {
   const badge = extra || endLabel(item, today);
-  return h('li', { 'data-q': `${item.text} ${item.note || ''}`.toLowerCase() },
+  // A chosen prayer shows its first words beneath its title.
+  const note = isPrayerItem(item) ? firstWords(itemPrayer(item, app.store.state.settings.rite || DEFAULT_RITE)?.text, 12) : item.note;
+  return h('li', { 'data-q': `${item.text} ${note || ''}`.toLowerCase() },
     h('button', { class: 'row', type: 'button', onclick: () => openItemSheet(app, item.id, { list, entry: item.builtin ? item : null }) },
       key && h('span', { class: 'row-key' }, key),
       h('span', { class: 'row-main' },
         h('span', { class: 'row-text' }, item.text),
-        item.note && h('span', { class: 'row-note' }, item.note)),
+        note && h('span', { class: 'row-note' }, note)),
       badge && h('span', { class: `badge ${badge === 'Last day' ? 'badge-warn' : ''}` }, badge)));
 }
 
@@ -112,7 +115,15 @@ export function renderListDetail(app, id) {
   const sorted = sortItems(list, list.items);
   let body;
 
-  if (list.type === 'daily') {
+  if (list.kind === 'prayers') {
+    body = list.items.length
+      ? [section('Praying each day', sorted.map((i) => row(app, i, { today })), {
+        action: h('button', { class: 'link-btn add-to', type: 'button', onclick: () => openPrayerPicker(app, list.id) }, icon('plus'), 'Choose'),
+      })]
+      : [h('div', { class: 'empty-card' },
+        h('p', null, 'No prayers chosen yet. Choose any of the Prayer Book’s Prayers and Thanksgivings, or write your own, to pray one by one each day.'),
+        h('button', { class: 'btn btn-sm btn-primary', type: 'button', onclick: () => openPrayerPicker(app, list.id) }, icon('plus'), 'Choose prayers'))];
+  } else if (list.type === 'daily') {
     const p = partitionByStatus(sorted, today);
     body = [
       section('Praying for', p.active.map((i) => row(app, i, { today }))),
@@ -173,7 +184,10 @@ export function renderListDetail(app, id) {
     h('div', { class: 'list-title' },
       h('h1', null, list.name),
       h('p', { class: 'list-sub' }, sub.join(' · '))),
-    h('div', { class: 'toolbar' },
+    list.kind === 'prayers' ? h('div', { class: 'toolbar' },
+      h('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: () => openPrayerPicker(app, list.id) }, icon('plus'), 'Choose prayers'),
+      list.hidden && h('button', { class: 'btn btn-sm', type: 'button', onclick: () => store.updateList(list.id, { hidden: false }) }, 'Show on Today'))
+    : h('div', { class: 'toolbar' },
       list.type !== 'dated' && list.type !== 'cycle' && h('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: () => openAddSheet(app, { listId: list.id }) }, icon('plus'), 'Add'),
       h('button', { class: 'btn btn-sm', type: 'button', onclick: () => openImportSheet(app, list.id) }, icon('paste'),
         list.type === 'cycle' ? (src?.builtin ? 'Load a newer cycle' : 'Add the cycle') : list.type === 'dated' ? 'Add dates' : 'Paste a list'),

@@ -1,9 +1,9 @@
 // Bottom sheets: quick add, edit an item, share a request with Trinity,
 // paste a list, list settings, and spreading a weekly list over the week.
 
-import { h, icon, replace, openSheet, confirmSheet, toast, chipGroup, toggle, autoGrow, plural } from './ui.js';
+import { h, icon, replace, openSheet, confirmSheet, toast, chipGroup, toggle, autoGrow, plural, prayerBody } from './ui.js';
 import { DURATIONS, endDateFor, sortItems, nameOf, planSpread, LIST_TYPES, SORTS, cycleSource } from './schedule.js';
-import { PRAYERS, SOURCE as PRAYER_SOURCE, prayerFor } from './prayers.js';
+import { SOURCE as PRAYER_SOURCE, SECTIONS, DEFAULT_PRAYERS, DEFAULT_RITE, RITES, prayersFor, prayerById, prayerText, firstWords, itemPrayer, isPrayerItem } from './prayers.js';
 import { bundleFor } from './bundles.js';
 import { seedFor } from './seeds.js';
 import { TRINITY_FORM, prefilledUrl, queueShare, cancelShare, flushOutbox, shareName, sharingChoice } from './share.js';
@@ -287,8 +287,9 @@ export function openShareSheet(app, itemId) {
  */
 export function openAddSheet(app, { text = '', listId = null, date = null, day: presetDay = null } = {}) {
   const { store } = app;
-  // Cycles (like the Anglican Cycle) come in whole; you add to the other lists.
-  const lists = store.state.lists.filter((l) => l.type !== 'cycle');
+  // Cycles (like the Anglican Cycle) come in whole, and prayers are chosen from
+  // the Prayer Book; you add names to the other lists.
+  const lists = store.state.lists.filter((l) => l.type !== 'cycle' && l.kind !== 'prayers');
   if (!lists.length) {
     toast('Make a list first (Lists → New list).');
     return null;
@@ -479,6 +480,7 @@ export function openItemSheet(app, itemId, { list: inList = null, entry = null }
   if (!found) return null;
   const { list, item } = found;
   if (list.type === 'cycle') return openEntrySheet(app, list, item);
+  if (isPrayerItem(item)) return openPrayerItemSheet(app, list, item);
   let target = list;
   let day = item.day;
   let date = item.date || app.viewDate;
@@ -539,7 +541,7 @@ export function openItemSheet(app, itemId, { list: inList = null, entry = null }
       target = next;
       renderSchedule();
     },
-  }, store.state.lists.filter((l) => l.type !== 'cycle').map((l) => h('option', { value: l.id, selected: l.id === list.id }, l.name)));
+  }, store.state.lists.filter((l) => l.type !== 'cycle' && l.kind !== 'prayers').map((l) => h('option', { value: l.id, selected: l.id === list.id }, l.name)));
 
   const details = [];
   if (item.created) details.push(`Added ${formatWithYear(todayKey(new Date(item.created)))}`);
@@ -913,7 +915,7 @@ export function openListSheet(app, listId = null) {
 
   const save = h('button', { class: 'btn btn-primary', type: 'submit' }, existing ? 'Save' : 'Create list');
   const del = existing && h('button', { class: 'btn btn-danger', type: 'button' }, icon('trash'), 'Delete list');
-  const prayer = existing ? prayerEditor(existing) : null;
+  const prayer = existing && existing.kind !== 'prayers' ? prayerEditor(existing, store.state.settings.rite || DEFAULT_RITE) : null;
   const builtinBack = existing?.type === 'cycle' && existing.items.length > 0 && bundleFor(existing)
     && h('button', {
       class: 'link-btn',
@@ -971,7 +973,7 @@ export function openListSheet(app, listId = null) {
       const patch = { name: value, sort, hidden };
       if (morningPrayer !== !!existing.morningPrayer) patch.morningPrayer = morningPrayer;
       if (existing.type === 'weekly' && everyDay !== !!existing.everyDay) patch.everyDay = everyDay;
-      if (prayer.changed()) patch.prayer = prayer.value();
+      if (prayer?.changed()) patch.prayer = prayer.value();
       store.updateList(existing.id, patch);
       sheet.close();
     } else {
@@ -1001,48 +1003,206 @@ export function openListSheet(app, listId = null) {
   return sheet;
 }
 
+/** A prayer's words for editing: its responses and rubrics without their marks. */
+const plainWords = (text) => String(text || '').split('\n').map((l) => l.replace(/^\*(.*)\*$/, '$1')).join('\n');
+
+/** The Prayer Book's prayers as a <select>, under its headings. */
+function prayerOptions(placeholder) {
+  return [
+    h('option', { value: '' }, placeholder),
+    SECTIONS.map((sec) => h('optgroup', { label: sec.title },
+      sec.prayers.map((p) => h('option', { value: p.id }, p.n ? `${p.n}. ${p.title}` : p.title)))),
+  ];
+}
+
 /**
- * The prayer that opens a list: any prayer from the Prayer Book, edited as
- * you like, your own words, or none. Returns { el, value(), changed() }.
+ * The prayers a list opens with, in order: any from the Prayer Book, reworded
+ * as you like, or your own words. Returns { el, value(), changed() }.
  */
-function prayerEditor(list) {
-  const current = prayerFor(list);
-  let choice = current ? (current.key && list.prayer?.text == null ? current.key : 'own') : 'none';
-  const title = h('input', { class: 'input', value: current?.title || '', placeholder: 'Title, e.g. For our Bishop', 'aria-label': 'Prayer title' });
-  const text = h('textarea', { class: 'input prayer-input', rows: 6, value: current?.text || '', 'aria-label': 'Prayer', placeholder: 'Write the prayer…' });
-  const editRow = h('div', { class: 'prayer-edit', hidden: choice === 'none' }, title, text);
-  const select = h('select', {
+function prayerEditor(list, rite) {
+  let rows = prayersFor(list, rite).map((p) => ({ key: p.key || null, title: p.title, text: plainWords(p.text), own: !!p.own }));
+  const specs = () => rows
+    .map((r) => {
+      const base = r.key ? prayerById(r.key) : null;
+      if (base && !r.own && r.title === base.title && r.text === plainWords(prayerText(base, rite))) return { key: base.id };
+      return r.text.trim() ? { title: r.title.trim() || 'Prayer', text: r.text.trim(), ...(base ? { key: base.id } : {}) } : null;
+    })
+    .filter(Boolean);
+  const start = JSON.stringify(specs());
+  const holder = h('ol', { class: 'prayer-rows' });
+  const move = (k, d) => { const j = k + d; if (j < 0 || j >= rows.length) return; [rows[k], rows[j]] = [rows[j], rows[k]]; render(); };
+
+  function render() {
+    replace(holder, rows.map((r, k) => {
+      const title = h('input', { class: 'input', value: r.title, placeholder: 'Title, e.g. For our Bishop', 'aria-label': 'Prayer title', oninput: (e) => { r.title = e.target.value; } });
+      const text = h('textarea', { class: 'input prayer-input', rows: 6, value: r.text, placeholder: 'Write the prayer…', 'aria-label': 'Prayer', oninput: (e) => { r.text = e.target.value; } });
+      const editRow = h('div', { class: 'prayer-edit', hidden: !r.open }, title, text);
+      return h('li', { class: 'prayer-row' },
+        h('div', { class: 'prayer-row-head' },
+          h('span', { class: 'prayer-row-title' }, r.title || 'Your own prayer'),
+          h('span', { class: 'prayer-row-tools' },
+            h('button', { class: 'icon-btn', type: 'button', 'aria-label': `Move “${r.title}” up`, disabled: k === 0, onclick: () => move(k, -1) }, icon('up')),
+            h('button', { class: 'icon-btn', type: 'button', 'aria-label': `Move “${r.title}” down`, disabled: k === rows.length - 1, onclick: () => move(k, 1) }, icon('down')),
+            h('button', { class: 'icon-btn', type: 'button', 'aria-label': `Remove “${r.title}”`, onclick: () => { rows.splice(k, 1); render(); } }, icon('x')))),
+        h('button', { class: 'link-btn', type: 'button', onclick: () => { r.open = !r.open; render(); } }, r.open ? 'Done changing the words' : 'Change the words'),
+        editRow);
+    }));
+    if (!rows.length) holder.append(h('li', { class: 'hint' }, 'No prayer opens this list.'));
+  }
+
+  const add = h('select', {
     class: 'input',
-    'aria-label': 'Prayer',
+    'aria-label': 'Add a prayer from the Prayer Book',
     onchange: () => {
-      choice = select.value;
-      editRow.hidden = choice === 'none';
-      if (PRAYERS[choice]) {
-        title.value = PRAYERS[choice].title;
-        text.value = PRAYERS[choice].text;
-      } else if (choice === 'own') {
-        text.focus();
+      const p = prayerById(add.value);
+      add.value = '';
+      if (!p) return;
+      rows.push({ key: p.id, title: p.title, text: plainWords(prayerText(p, rite)), own: false });
+      render();
+    },
+  }, prayerOptions('Add a prayer from the Prayer Book…'));
+  const own = h('button', { class: 'link-btn', type: 'button', onclick: () => { rows.push({ key: null, title: '', text: '', own: true, open: true }); render(); } }, icon('plus'), 'Write your own');
+
+  render();
+  const value = () => {
+    const out = specs();
+    if (!out.length) return null;
+    // The list's usual prayers, as they stand, follow the app's defaults.
+    const usual = (DEFAULT_PRAYERS[list.id] || []).map((key) => ({ key }));
+    if (JSON.stringify(out) === JSON.stringify(usual)) return undefined;
+    return out.length === 1 ? out[0] : out;
+  };
+  const el = field('Prayers',
+    h('p', { class: 'hint field-hint' }, 'Said at the start of this list on Today and in pray-through, in this order.'),
+    holder,
+    h('div', { class: 'prayer-add' }, add, own));
+  return { el, value, changed: () => JSON.stringify(specs()) !== start };
+}
+
+// ---------- prayers and thanksgivings to pray one by one ----------
+
+const normalize = (s) => String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[’']/g, "'");
+
+/**
+ * Choose any of the Prayer Book's Prayers and Thanksgivings to pray one by one.
+ * Its headings stay folded, each showing how many are chosen, and a search
+ * finds any prayer by its words, so it's never one long checklist.
+ */
+export function openPrayerPicker(app, listId = null) {
+  const { store } = app;
+  const list = (listId && store.list(listId)) || store.state.lists.find((l) => l.kind === 'prayers');
+  if (!list) { toast('There’s no Prayers and Thanksgivings list. Make one from Lists → New list.'); return null; }
+  const rite = store.state.settings.rite || DEFAULT_RITE;
+  const chosen = () => new Set(store.list(list.id)?.items.map((i) => i.prayer).filter(Boolean));
+  const counter = h('p', { class: 'hint picker-count' });
+  const sections = [];
+
+  const refreshCounts = () => {
+    const picked = chosen();
+    counter.textContent = picked.size
+      ? `${plural(picked.size, 'prayer')} chosen. Each comes up on its own, to pray and check off.`
+      : 'Nothing chosen yet. Open a heading, or search, and check the prayers you want each day.';
+    for (const { el, prayers } of sections) {
+      const n = prayers.filter((p) => picked.has(p.id)).length;
+      el.querySelector('.picker-chosen').textContent = n ? `${n} chosen` : '';
+    }
+  };
+  const choose = (p, on) => {
+    const l = store.list(list.id);
+    if (!l) return;
+    if (on && !l.items.some((i) => i.prayer === p.id)) store.addItems(l.id, [{ text: p.title, prayer: p.id }]);
+    if (!on) for (const i of l.items.filter((x) => x.prayer === p.id)) store.deleteItem(i.id);
+    refreshCounts();
+  };
+
+  const picked = chosen();
+  const body = h('div', { class: 'picker-sections' }, SECTIONS.map((sec) => {
+    const rows = sec.prayers.map((p) => {
+      const words = prayerText(p, rite);
+      return h('li', { class: 'picker-row', 'data-q': normalize(`${p.title} ${words}`) },
+        h('label', { class: 'picker-check' },
+          h('input', { type: 'checkbox', checked: picked.has(p.id), onchange: (e) => choose(p, e.target.checked) }),
+          h('span', { class: 'picker-title' }, p.n ? `${p.n}. ${p.title}` : p.title)),
+        h('details', { class: 'picker-words' }, h('summary', null, firstWords(words, 9)), prayerBody(words)));
+    });
+    const el = h('details', { class: 'picker-section' },
+      h('summary', null,
+        h('span', { class: 'picker-heading' }, sec.title),
+        h('span', { class: 'picker-chosen' })),
+      h('ul', { class: 'picker-list' }, rows));
+    sections.push({ el, prayers: sec.prayers });
+    return el;
+  }));
+
+  const search = h('input', {
+    type: 'search',
+    class: 'input search',
+    placeholder: 'Find a prayer by its words',
+    'aria-label': 'Find a prayer by its words',
+    oninput: () => {
+      const q = normalize(search.value.trim());
+      for (const { el } of sections) {
+        let any = false;
+        for (const li of el.querySelectorAll('.picker-row')) {
+          const show = !q || li.dataset.q.includes(q);
+          li.hidden = !show;
+          any ||= show;
+        }
+        el.hidden = !!q && !any;
+        el.open = !!q && any;
       }
     },
-  },
-  h('option', { value: 'none', selected: choice === 'none' }, 'No prayer'),
-  h('optgroup', { label: PRAYER_SOURCE },
-    Object.entries(PRAYERS).map(([key, p]) => h('option', { value: key, selected: choice === key }, p.title))),
-  h('option', { value: 'own', selected: choice === 'own' }, 'My own words'));
-  const start = JSON.stringify(current);
-  const value = () => {
-    if (choice === 'none') return null;
-    const base = PRAYERS[choice];
-    // An unedited Prayer Book prayer is stored by name; anything edited is stored as written.
-    if (base && title.value === base.title && text.value === base.text) return { key: choice };
-    if (!text.value.trim()) return null;
-    return { title: title.value.trim() || 'Prayer', text: text.value.trim(), key: base ? choice : null };
-  };
-  const el = field('Prayer',
-    h('p', { class: 'hint field-hint' }, 'Said at the start of this list on Today and in pray-through. Choose one, then change its words if you like.'),
-    select,
-    editRow);
-  return { el, value, changed: () => JSON.stringify(value() && prayerFor({ ...list, prayer: value() })) !== start };
+  });
+
+  // Your own prayer, to pray with the rest.
+  const ownTitle = h('input', { class: 'input', placeholder: 'Title, e.g. For the Vestry', 'aria-label': 'Title of your prayer' });
+  const ownText = h('textarea', { class: 'input prayer-input', rows: 5, placeholder: 'Write the prayer…', 'aria-label': 'Your prayer' });
+  const ownAdd = h('button', {
+    class: 'btn btn-sm',
+    type: 'button',
+    onclick: () => {
+      if (!ownText.value.trim()) { ownText.focus(); return; }
+      store.addItems(list.id, [{ text: ownTitle.value.trim() || 'Prayer', prayerText: ownText.value }]);
+      toast(`Added “${short(ownTitle.value.trim() || 'Prayer', 32)}”`);
+      ownTitle.value = '';
+      ownText.value = '';
+    },
+  }, icon('plus'), 'Add this prayer');
+  const ownBox = h('details', { class: 'picker-section picker-own' },
+    h('summary', null, h('span', { class: 'picker-heading' }, 'Your own prayer'), h('span', { class: 'picker-chosen' })),
+    h('div', { class: 'prayer-edit' }, ownTitle, ownText, h('div', null, ownAdd)));
+
+  const done = h('button', { class: 'btn btn-primary btn-block', type: 'button', onclick: () => sheet.close() }, 'Done');
+  const content = h('div', { class: 'picker' },
+    h('p', { class: 'sheet-text' }, `From the Prayer Book’s Prayers and Thanksgivings, in ${RITES.find((r) => r.value === rite)?.label || 'Rite Two'} language where it has both (change it in Settings).`),
+    search,
+    counter,
+    body,
+    ownBox,
+    h('div', { class: 'sheet-actions' }, done));
+  refreshCounts();
+  const sheet = openSheet({ title: 'Prayers and Thanksgivings', className: 'sheet-picker', content });
+  return sheet;
+}
+
+/** One of your Prayers and Thanksgivings, to read in full or take off the list. */
+function openPrayerItemSheet(app, list, item) {
+  const { store } = app;
+  const p = itemPrayer(item, store.state.settings.rite || DEFAULT_RITE);
+  const base = item.prayer ? prayerById(item.prayer) : null;
+  const remove = h('button', { class: 'btn btn-danger', type: 'button' }, icon('trash'), 'Remove');
+  const done = h('button', { class: 'btn btn-primary', type: 'button', onclick: () => sheet.close() }, 'Done');
+  const content = h('div', { class: 'prayer-sheet' },
+    prayerBody(p.text, 'prayer-text prayer-read'),
+    base?.page && h('p', { class: 'hint' }, `${PRAYER_SOURCE}, page ${base.page}`),
+    h('div', { class: 'sheet-actions sheet-actions-split' }, remove, done));
+  const sheet = openSheet({ title: p.title, className: 'sheet-prayer', content });
+  remove.addEventListener('click', () => {
+    const removed = store.deleteItem(item.id);
+    sheet.close();
+    toast(`Took “${short(item.text, 32)}” off ${list.name}`, { action: 'Undo', onAction: () => store.restoreItem(removed) });
+  });
+  return sheet;
 }
 
 // ---------- spread a weekly list ----------

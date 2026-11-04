@@ -39,7 +39,7 @@ export const LIST_TYPES = new Set(['daily', 'weekly', 'monthly', 'dated', 'cycle
 
 /** Entries copied in from a built-in cycle (see seeds.js) have ids starting with this. */
 export const SEED_PREFIX = 'seed-';
-const DEFAULT_LIST_IDS = new Set(['anglican', 'diocese', 'diocese-daily', 'trinity', 'requests', 'family', 'clergy']);
+const DEFAULT_LIST_IDS = new Set(['anglican', 'diocese', 'diocese-daily', 'trinity', 'requests', 'family', 'clergy', 'prayers']);
 
 /**
  * Tombstones that are never forgotten: for built-in entries and the lists the
@@ -62,10 +62,12 @@ export function defaultState(now = Date.now(), today = todayKey()) {
       list({ id: 'requests', name: 'Prayer Requests', type: 'daily' }),
       list({ id: 'family', name: 'Family', type: 'daily' }),
       list({ id: 'clergy', name: 'Clergy', type: 'daily', sort: 'last' }),
+      // Prayers and thanksgivings from the Prayer Book, chosen to pray one by one.
+      list({ id: 'prayers', name: 'Prayers and Thanksgivings', type: 'daily', kind: 'prayers' }),
     ],
     checks: {},
     tombstones: {},
-    settings: { palette: 'burgundy', foldShortMonths: true, theme: 'auto', showPrayers: true, updated: 0 },
+    settings: { palette: 'burgundy', foldShortMonths: true, theme: 'auto', showPrayers: true, rite: 'contemporary', updated: 0 },
     orderUpdated: 0,
     meta: { created: now, lastBackup: null, quickAddList: 'requests', durations: {} },
   };
@@ -303,6 +305,9 @@ export class Store {
       since: isValidKey(entry.since) ? entry.since : todayKey(new Date(this.clock())),
     };
     if (entry.note && String(entry.note).trim()) item.note = String(entry.note).trim();
+    // An entry in Prayers and Thanksgivings: a Prayer Book prayer, or your own words.
+    if (entry.prayer) item.prayer = String(entry.prayer);
+    if (entry.prayerText && String(entry.prayerText).trim()) item.prayerText = String(entry.prayerText).trim();
     if (list.sort === 'last') {
       if (entry.last != null) {
         item.first = entry.first || '';

@@ -31,12 +31,21 @@ function diocesanSeed(d) {
   };
 }
 
-export const SEEDS = [diocesanSeed(wisconsin)];
+/** Lists added to the app since it first shipped, for copies that started without them. */
+const NEW_LISTS = {
+  id: 'lists-2026-11',
+  updated: Date.parse('2026-11-04T00:00:00Z'),
+  lists: [
+    { list: { id: 'prayers', name: 'Prayers and Thanksgivings', type: 'daily', kind: 'prayers' }, after: 'clergy', entries: [] },
+  ],
+};
+
+export const SEEDS = [diocesanSeed(wisconsin), NEW_LISTS];
 
 /** The built-in cycle (and its part) that fills a list, if any. */
 export function seedFor(listId) {
   for (const seed of SEEDS) {
-    const part = seed.lists.find((p) => p.list.id === listId);
+    const part = seed.lists.find((p) => p.list.id === listId && p.entries.length);
     if (part) return { seed, part };
   }
   return null;

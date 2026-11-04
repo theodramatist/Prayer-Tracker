@@ -3,12 +3,12 @@
 // away; "Show prayed" brings them back. Lists read at Morning Prayer come
 // first, each as one list marked once, apart from your own prayer below.
 
-import { h, icon, toast, plural } from './ui.js';
+import { h, icon, toast, plural, prayerBody } from './ui.js';
 import { agenda, carriedOver, endLabel, entryCount, officeFor } from './schedule.js';
 import { formatDate, formatLong, formatMedium, formatWithYear, diffDays } from './dates.js';
 import { dayTitle } from './calendar.js';
-import { prayerFor } from './prayers.js';
-import { openAddSheet, openItemSheet, openImportSheet, loadSeed, ACP_URL } from './sheets.js';
+import { prayersFor, itemPrayer, isPrayerItem, firstWords, DEFAULT_RITE } from './prayers.js';
+import { openAddSheet, openItemSheet, openImportSheet, openPrayerPicker, loadSeed, ACP_URL } from './sheets.js';
 import { seedFor } from './seeds.js';
 import { openPrayThrough } from './praythrough.js';
 import { saveBackup } from './settings.js';
@@ -196,19 +196,24 @@ function filterChips(app, groups, model) {
     withItems.map((g) => chip(g.list.id, g.list.name, left(g))));
 }
 
+/** The prayers a list opens with, each folded until tapped. */
 function prayerBlock(app, list) {
-  if (app.store.state.settings.showPrayers === false) return null;
-  const p = prayerFor(list);
-  if (!p) return null;
+  const { settings } = app.store.state;
+  if (settings.showPrayers === false) return null;
+  const prayers = prayersFor(list, settings.rite || DEFAULT_RITE);
+  if (!prayers.length) return null;
   app.openPrayers ||= new Set();
-  const summary = h('summary', null, h('span', { class: 'prayer-title' }, p.title), h('span', { class: 'prayer-first' }, p.text));
-  const el = h('details', { class: 'prayer', open: app.openPrayers.has(list.id) }, summary, h('p', { class: 'prayer-text' }, p.text));
-  // Remember it at the tap itself (the toggle event comes a moment later).
-  summary.addEventListener('click', () => {
-    if (el.open) app.openPrayers.delete(list.id);
-    else app.openPrayers.add(list.id);
+  return prayers.map((p, k) => {
+    const id = `${list.id}:${k}`;
+    const summary = h('summary', null, h('span', { class: 'prayer-title' }, p.title), h('span', { class: 'prayer-first' }, firstWords(p.text, 40)));
+    const el = h('details', { class: 'prayer', open: app.openPrayers.has(id) }, summary, prayerBody(p.text));
+    // Remember it at the tap itself (the toggle event comes a moment later).
+    summary.addEventListener('click', () => {
+      if (el.open) app.openPrayers.delete(id);
+      else app.openPrayers.add(id);
+    });
+    return el;
   });
-  return el;
 }
 
 function groupSection(app, g, model) {
@@ -227,6 +232,8 @@ function groupSection(app, g, model) {
     !complete && prayerBlock(app, g.list),
     pending.length > 0 && h('ul', { class: 'items' }, pending.map((i) => itemRow(app, g.list, i, false))),
     pending.length >= 3 && allPrayed(app, pending, model.date),
+    g.list.kind === 'prayers' && h('div', { class: 'group-foot' },
+      h('button', { class: 'link-btn', type: 'button', onclick: () => openPrayerPicker(app, g.list.id) }, icon('plus'), 'Choose prayers')),
     g.carried.length > 0 && carriedBlock(app, g),
     app.showDone && done.length > 0 && h('ul', { class: 'items items-done' }, done.map((i) => itemRow(app, g.list, i, true))));
 }
@@ -308,13 +315,15 @@ function itemRow(app, list, item, isDone, { date = app.viewDate, from = null } =
     'aria-checked': String(isDone),
     'aria-label': `${item.text}${from ? ` (${from})` : ''}: ${isDone ? 'prayed' : 'not yet prayed'}`,
   }, icon('check'));
+  // A prayer from "Prayers and Thanksgivings": its title, and its first words.
+  const prayer = isPrayerItem(item) ? itemPrayer(item, store.state.settings.rite || DEFAULT_RITE) : null;
   const body = h('button', {
     class: 'item-body',
     type: 'button',
     onclick: () => openItemSheet(app, item.id, { list, entry: item.builtin ? item : null }),
   },
   h('span', { class: 'item-text' }, item.text),
-  item.note && h('span', { class: 'item-note' }, item.note),
+  prayer ? h('span', { class: 'item-note item-prayer' }, firstWords(prayer.text, 14)) : item.note && h('span', { class: 'item-note' }, item.note),
   badge && h('span', { class: `badge ${badge === 'Last day' ? 'badge-warn' : ''} ${from ? 'badge-from' : ''}` }, badge));
   li.append(check, body);
 

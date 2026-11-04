@@ -6,6 +6,8 @@ import { dayTitle } from './calendar.js';
 import { VERSION } from './version.js';
 import { SEEDS } from './seeds.js';
 import { TRINITY_FORM, shareName, pendingShares } from './share.js';
+import { RITES, DEFAULT_RITE } from './prayers.js';
+import { openPrayerPicker } from './sheets.js';
 
 const field = (label, ...children) => h('div', { class: 'field' }, h('span', { class: 'field-label' }, label), children);
 const card = (title, ...children) => h('section', { class: 'settings-card' }, h('h2', null, title), children);
@@ -212,12 +214,23 @@ export function renderSettings(app) {
       }))),
 
     card('Prayers',
+      field('Language', chipGroup({
+        label: 'Language of the prayers',
+        className: 'chips-rite',
+        value: s.rite || DEFAULT_RITE,
+        options: RITES.map((r) => ({ value: r.value, label: r.label })),
+        onChange: (v) => store.setSetting('rite', v),
+      })),
+      h('p', { class: 'hint' }, 'Rite One is traditional language, Rite Two contemporary. Prayers the Prayer Book gives in traditional language, with their pronouns and verbs in italics, can be said either way; the rest keep the one form it gives them.'),
       toggle({
-        label: 'Show each list’s prayer',
-        hint: 'A prayer from the Prayer Book opens each list on Today and in pray-through. To change one, open the list and tap ⋯.',
+        label: 'Show each list’s prayers',
+        hint: 'Prayers from the Prayer Book open each list on Today and in pray-through. To change them, open the list and tap ⋯.',
         checked: s.showPrayers !== false,
         onChange: (v) => store.setSetting('showPrayers', v),
-      })),
+      }),
+      h('div', { class: 'button-row' },
+        h('button', { class: 'btn btn-sm', type: 'button', onclick: () => openPrayerPicker(app) }, icon('plus'), 'Choose prayers and thanksgivings')),
+      h('p', { class: 'hint' }, 'Any of the Prayer Book’s Prayers and Thanksgivings, to pray one by one each day.')),
 
     shareCard(app),
 

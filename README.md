@@ -57,9 +57,21 @@ You can rename, reorder, hide or delete any of these, and make more lists of any
   several requests. If you're offline it waits on the device and goes when you're back
   online. The request then shows when it was shared. Trinity prays for a request for a
   month, so for an ongoing one, tap it and choose **Share with Trinity again**.
-- **Change a list's prayer:** open the list, tap **⋯**, and under Prayer choose another
-  from the Prayer Book, change its words (say, to name your bishop in *For the Diocese*),
-  write your own, or choose none.
+- **Change a list's prayers:** open the list, tap **⋯**, and under Prayers add others
+  from the Prayer Book (listed under its own headings), put them in order, change their
+  words (say, to name your bishop in *For the Diocese*), write your own, or remove them.
+  *Prayer Requests* opens with the prayer from the Great Vigil of Easter ("God and Father
+  of all believers…"), then *For All Sorts and Conditions of Men*.
+- **Rite One or Rite Two:** Settings → Prayers → Language. The Prayer Book keeps prayers
+  written in traditional language as they are, but prints their pronouns and verbs in
+  italics "to assist in rendering them into contemporary speech"; those 20 prayers follow
+  your choice, rendering just the italic words. The rest keep the one form it gives them.
+- **Prayers and Thanksgivings:** any of the Prayer Book's 70 prayers and 11 thanksgivings
+  (pages 810–841) can be prayed one by one each day. **Lists → Prayers and Thanksgivings →
+  Choose prayers** (or Settings → Prayers) opens them under the Prayer Book's headings,
+  folded shut, each showing how many you've chosen; search finds a prayer by its words,
+  and a check adds it. Each comes up on Today and in pray-through to say and check off;
+  tap one to read it in full. You can add your own prayers there too.
 - **Colours:** Settings → Colour. *Burgundy* on warm ivory is the default; *Blue* is deep
   blue on linen; *Church year* tints the whole app in the liturgical colour of the day,
   as the ribbon on Today always shows it. Each has a dark version.
@@ -248,8 +260,11 @@ Layout: `index.html`, `css/app.css`, and ES modules in `js/`:
 - `schedule.js` decides what is due on a date, including cycles and carry-forward.
 - `calendar.js` holds the BCP 1979 calendar (feasts, named Sundays, Propers, transfers);
   `liturgy.js` works out seasons and Easter.
-- `prayers.js` holds the Prayer Book prayers; `bundles.js` and `data/acp.js` hold the
-  built-in Anglican Cycle; `seeds.js` and `data/diocese.js` hold the diocese's cycles,
+- `prayers.js` holds the prayers, from `data/prayers.js`: the Prayer Book's Prayers and
+  Thanksgivings exactly as printed, built from its PDF by
+  `node scripts/build-prayers.mjs path/to/praytnx.pdf`, which also renders the italic
+  pronouns and verbs for Rite Two. `bundles.js` and `data/acp.js` hold the built-in
+  Anglican Cycle; `seeds.js` and `data/diocese.js` hold the diocese's cycles,
   which are copied into their lists on first run (`scripts/build-diocese.mjs` builds them).
 - `importer.js` reads pasted text and `pdf.js` reads PDFs; `names.js` handles
   last-name sorting.

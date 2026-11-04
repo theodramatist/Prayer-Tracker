@@ -21,7 +21,7 @@ test('first run creates the four cycles and the daily lists', () => {
   const types = store.state.lists.map((l) => [l.id, l.type]);
   assert.deepEqual(types, [
     ['anglican', 'cycle'], ['diocese', 'monthly'], ['diocese-daily', 'dated'], ['trinity', 'weekly'],
-    ['requests', 'daily'], ['family', 'daily'], ['clergy', 'daily'],
+    ['requests', 'daily'], ['family', 'daily'], ['clergy', 'daily'], ['prayers', 'daily'],
   ]);
   assert.equal(store.list('trinity').sort, 'last');
 });
@@ -35,7 +35,7 @@ test('items persist across reloads; corrupt data is kept aside, not lost', () =>
 
   const bad = memoryStorage({ [STORAGE_KEY]: '{not json' });
   const c = new Store(bad);
-  assert.equal(c.state.lists.length, 7);
+  assert.equal(c.state.lists.length, 8);
   assert.ok(Object.keys(bad.data).some((k) => k.startsWith(`${STORAGE_KEY}:unreadable:`)));
 });
 
@@ -152,7 +152,7 @@ test('lists: add, rename, hide, reorder, delete', () => {
   store.updateList(list.id, { hidden: false });
   assert.equal('hidden' in store.list(list.id), false);
   store.moveList(list.id, -1);
-  assert.equal(store.state.lists[6].id, list.id);
+  assert.equal(store.state.lists[7].id, list.id);
   store.setMeta('quickAddList', list.id);
   store.deleteList(list.id);
   assert.equal(store.list(list.id), null);

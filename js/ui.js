@@ -236,3 +236,15 @@ export function autoGrow(textarea, max = 240) {
 export function plural(n, one, many = `${one}s`) {
   return `${n.toLocaleString()} ${n === 1 ? one : many}`;
 }
+
+/**
+ * A prayer's words as paragraphs. A line in *asterisks* is the people's
+ * response, or a rubric such as "or this", and is set in italics.
+ */
+export function prayerBody(text, className = 'prayer-text') {
+  return h('div', { class: className },
+    String(text || '').split('\n').filter((l) => l.trim()).map((line) => {
+      const m = line.match(/^\*(.*)\*$/);
+      return m ? h('p', { class: 'prayer-response' }, h('em', null, m[1])) : h('p', null, line);
+    }));
+}
