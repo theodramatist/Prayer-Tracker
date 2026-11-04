@@ -210,12 +210,33 @@ if (params.has('add') || params.has('text') || params.has('title') || params.has
   openAddSheet(app, { text: shared || params.get('add') || '', listId });
 }
 
+// Offline copy and updates. The browser keeps the app to work offline, so a
+// new version only runs once the page reloads: look for one whenever the app
+// comes back to the front (and hourly), and switch to it as soon as that won't
+// interrupt anything: straight away if it arrives as the app opens, otherwise
+// the next time you come back to it, with a banner on Today meanwhile.
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   const hadController = !!navigator.serviceWorker.controller;
-  navigator.serviceWorker.register('./sw.js').catch(() => { /* offline support unavailable */ });
+  const openedAt = Date.now();
+  const busy = () => !!document.querySelector('dialog[open]');
+  navigator.serviceWorker.register('./sw.js').then((reg) => {
+    let lastCheck = Date.now();
+    const check = () => {
+      if (Date.now() - lastCheck < 10 * 60 * 1000) return;
+      lastCheck = Date.now();
+      reg.update().catch(() => { /* offline */ });
+    };
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
+    setInterval(check, 60 * 60 * 1000);
+  }).catch(() => { /* offline support unavailable */ });
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (!hadController) return;
-    toast('The app has been updated.', { action: 'Reload', onAction: () => location.reload(), duration: 15000 });
+    if (Date.now() - openedAt < 10000 && !busy()) { location.reload(); return; }
+    app.updateReady = true;
+    render();
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && app.updateReady && !busy()) location.reload();
   });
 }
 

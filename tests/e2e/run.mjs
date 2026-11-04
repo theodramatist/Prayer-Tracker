@@ -1053,6 +1053,33 @@ await step('no errors in the console (part 2)', async () => {
   assert.deepEqual(real, []);
 });
 
+await step('on a computer: the same two-column Morning Prayer list, and list chips that wrap instead of running out of reach', async () => {
+  const desk = await browser.newContext({ viewport: { width: 1280, height: 900 }, locale: 'en-US', timezoneId: 'America/New_York', serviceWorkers: 'block' });
+  const dp = await desk.newPage();
+  await dp.clock.setFixedTime(new Date('2026-11-04T09:00:00-05:00')); // a Wednesday
+  await dp.goto(BASE);
+  await dp.locator('.day-head h1').waitFor();
+  await dp.evaluate(() => {
+    const { store } = window.prayerTracker;
+    const names = ['Ann Abbot', 'Bob Brent', 'Cy Coyle', 'Di Drury', 'Ed Esmond', 'Flo Fenwick', 'Gus Garth', 'Hal Hale', 'Ida Ives', 'Jo Jay', 'Kit Kay', 'Lu Lee', 'Mo Moss', 'Ned Nash', 'Ola Orr'];
+    store.addItems('trinity', names.map((text) => ({ text })));
+    store.distributeWeekly('trinity');
+    store.addItems('requests', [{ text: 'A request' }]);
+    store.addItems('family', [{ text: 'Mom' }]);
+    store.addItems('clergy', [{ text: 'Fr. Example' }]);
+  });
+  await dp.locator('.office-list[data-office=trinity]').waitFor();
+  assert.equal(await dp.locator('.office-list[data-office=trinity] .group-label').innerText(), 'WEDNESDAY');
+  assert.equal(await dp.locator('.office-names').evaluate((el) => getComputedStyle(el).columnCount), '2');
+  assert.equal(await dp.locator('.group[data-list=trinity] .group-label').innerText(), 'EVERY DAY');
+  const chips = dp.locator('.filter-chips');
+  assert.equal(await chips.evaluate((el) => getComputedStyle(el).flexWrap), 'wrap');
+  assert.ok(await chips.evaluate((el) => el.scrollWidth <= el.clientWidth + 1), 'every chip in view');
+  assert.ok(await dp.locator('.filter-chips .chip', { hasText: 'Clergy' }).isVisible());
+  await dp.screenshot({ path: `${OUT}40-desktop.png` });
+  await desk.close();
+});
+
 await writeFile(`${OUT}summary.txt`, `${passed} steps passed\n`);
 console.log(`\n${passed} steps passed`);
 await browser.close();

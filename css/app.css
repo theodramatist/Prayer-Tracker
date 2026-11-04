@@ -432,6 +432,11 @@ code { font: 0.92em/1 ui-monospace, "SF Mono", Menlo, monospace; padding: 1px 5p
 .chips::-webkit-scrollbar { display: none; }
 .chips-wrap { flex-wrap: wrap; overflow: visible; }
 .filter-chips { margin: 16px -16px 2px; padding: 2px 16px; scroll-padding: 16px; }
+/* With a mouse there's no swipe, so rows of chips that scroll sideways on a
+   phone wrap onto more lines instead, with every chip in view. */
+@media (hover: hover) and (pointer: fine) {
+  .filter-chips, .chips-lists { flex-wrap: wrap; overflow-x: visible; }
+}
 .chip {
   flex: none;
   display: inline-flex; align-items: center; gap: 6px;

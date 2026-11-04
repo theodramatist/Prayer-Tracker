@@ -423,6 +423,12 @@ function cycleEndedCard(app, list) {
 function banners(app) {
   const { store } = app;
   const out = [];
+  if (app.updateReady) {
+    out.push(h('div', { class: 'banner', role: 'status' },
+      h('p', null, 'A new version of the app is ready.'),
+      h('div', { class: 'banner-actions' },
+        h('button', { class: 'btn btn-sm btn-primary', type: 'button', onclick: () => location.reload() }, 'Reload now'))));
+  }
   if (!store.persistent) {
     out.push(h('div', { class: 'banner banner-warn', role: 'alert' },
       h('p', null, 'This browser isn’t letting the app save (private browsing?). Changes will be lost when you close it.')));

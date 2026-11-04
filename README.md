@@ -281,8 +281,10 @@ question, and copy the `entry.…` codes from the link into that file. Google do
 other sites whether it recorded a response, so the app counts a request as shared once it
 reaches Google; the share sheet also offers to open the form itself, filled in.
 
-**Releasing a change:** bump the version in both `js/version.js` and `sw.js`. Installed
-copies then fetch the new files and offer to reload. A unit test checks that the two
+**Releasing a change:** bump the version in both `js/version.js` and `sw.js`. Each copy
+looks for a new version when it's opened or comes back to the front (and hourly), and
+switches to it straight away if it arrives as the app opens, or else the next time you
+come back to it, with a **Reload now** banner on Today meanwhile. A unit test checks that the two
 versions match and that `sw.js` lists every app file.
 
 Type: [Fraunces](https://github.com/undercasetype/Fraunces) for headings and prayers and
