@@ -674,7 +674,8 @@ await step('each list opens with its prayer, folded until tapped', async () => {
   assert.equal(await page.locator('.group[data-list=anglican] .prayer-title').innerText(), 'FOR THE CHURCH');
   assert.equal(await page.locator('.group[data-list=anglican] .prayer-text').isVisible(), false);
   await page.locator('.group[data-list=anglican] .prayer summary').click();
-  assert.match(await page.locator('.group[data-list=anglican] .prayer-text').innerText(), /^Gracious Father, we pray for thy holy Catholic Church/);
+  // In Rite Two (the default), even the classical prayers say "you" and "your".
+  assert.match(await page.locator('.group[data-list=anglican] .prayer-text').innerText(), /^Gracious Father, we pray for your holy Catholic Church/);
   await shot('20-today-prayer-open');
   await page.locator('.group[data-list=anglican] .prayer summary').click();
 });

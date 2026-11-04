@@ -3,7 +3,7 @@
 
 import { h, icon, replace, openSheet, confirmSheet, toast, chipGroup, toggle, autoGrow, plural, prayerBody } from './ui.js';
 import { DURATIONS, endDateFor, sortItems, nameOf, planSpread, LIST_TYPES, SORTS, cycleSource } from './schedule.js';
-import { SOURCE as PRAYER_SOURCE, SECTIONS, DEFAULT_PRAYERS, DEFAULT_RITE, RITES, prayersFor, prayerById, prayerText, firstWords, itemPrayer, isPrayerItem } from './prayers.js';
+import { SOURCE as PRAYER_SOURCE, SECTIONS, DEFAULT_PRAYERS, DEFAULT_RITE, RITES, prayersFor, prayerById, prayerText, firstWords, itemPrayer, isPrayerItem, renderedByApp } from './prayers.js';
 import { bundleFor } from './bundles.js';
 import { seedFor } from './seeds.js';
 import { TRINITY_FORM, prefilledUrl, queueShare, cancelShare, flushOutbox, shareName, sharingChoice } from './share.js';
@@ -1192,9 +1192,11 @@ function openPrayerItemSheet(app, list, item) {
   const base = item.prayer ? prayerById(item.prayer) : null;
   const remove = h('button', { class: 'btn btn-danger', type: 'button' }, icon('trash'), 'Remove');
   const done = h('button', { class: 'btn btn-primary', type: 'button', onclick: () => sheet.close() }, 'Done');
+  const rite = store.state.settings.rite || DEFAULT_RITE;
   const content = h('div', { class: 'prayer-sheet' },
     prayerBody(p.text, 'prayer-text prayer-read'),
     base?.page && h('p', { class: 'hint' }, `${PRAYER_SOURCE}, page ${base.page}`),
+    renderedByApp(base) && rite === 'contemporary' && h('p', { class: 'hint' }, 'The Prayer Book gives this prayer in traditional language only; here it says you and your.'),
     h('div', { class: 'sheet-actions sheet-actions-split' }, remove, done));
   const sheet = openSheet({ title: p.title, className: 'sheet-prayer', content });
   remove.addEventListener('click', () => {

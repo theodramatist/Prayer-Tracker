@@ -65,7 +65,11 @@ You can rename, reorder, hide or delete any of these, and make more lists of any
 - **Rite One or Rite Two:** Settings → Prayers → Language. The Prayer Book keeps prayers
   written in traditional language as they are, but prints their pronouns and verbs in
   italics "to assist in rendering them into contemporary speech"; those 20 prayers follow
-  your choice, rendering just the italic words. The rest keep the one form it gives them.
+  your choice, rendering just the italic words. The 10 classical prayers it leaves
+  unmarked (among them For the Church, For Clergy and People, and All Sorts and
+  Conditions) are rendered the same way in Rite Two: you and your for thee, thou, thy and
+  thine, with their verbs to match. Prayers already in contemporary language have just
+  the one form.
 - **Prayers and Thanksgivings:** any of the Prayer Book's 70 prayers and 11 thanksgivings
   (pages 810–841) can be prayed one by one each day. **Lists → Prayers and Thanksgivings →
   Choose prayers** (or Settings → Prayers) opens them under the Prayer Book's headings,

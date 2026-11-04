@@ -9,7 +9,11 @@
 // modernization, pronouns and verbs have been put in italics to assist in
 // rendering them into contemporary speech." So a prayer whose pronouns and
 // verbs are in italics gets a contemporary (Rite Two) form too, made by
-// rendering just those italic words; the rest stay as they are.
+// rendering just those italic words; the rest stay as they are. The few
+// traditional prayers it leaves unmarked ("classical" ones, such as For All
+// Sorts and Conditions of Men) are rendered the same way, with you and your
+// for thee, thou, thy and thine and their verbs to match, and are marked as
+// rendered by the app.
 
 import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -191,6 +195,32 @@ function render(p) {
   return { convertible, romanArchaic, traditional: paras.traditional.join('\n'), contemporary: paras.contemporary.join('\n') };
 }
 
+// Classical prayers (traditional, with nothing in italics): the same rendering
+// over the whole prayer. In the opening address ("O merciful Father, who hast
+// taught us…:"), "who" with its verb becomes "you", as Rite Two words collects.
+const PRONOUNS = /\b(thee|thou|thy|thine|thyself)\b/i;
+const CLASSICAL = {
+  thee: 'you', thou: 'you', thy: 'your', thyself: 'yourself', unto: 'to',
+  hast: 'have', hath: 'has', art: 'are', dost: 'do', doth: 'does', didst: 'did', wilt: 'will', shalt: 'shall', wouldest: 'would',
+  cometh: 'comes', passeth: 'passes', settest: 'set', livest: 'live', reignest: 'reign',
+};
+const ADDRESS_VERBS = 'hast|art|dost|didst|wilt|settest|livest';
+const cap = (w, m) => (w[0] === w[0].toUpperCase() && w[0] !== w[0].toLowerCase() ? m[0].toUpperCase() + m.slice(1) : m);
+
+function renderClassical(text) {
+  return text.split('\n').map((para, i) => {
+    if (/^\*.*\*$/.test(para)) return para;
+    let out = para;
+    const colon = out.indexOf(':');
+    if (i === 0 && colon > 0) {
+      const head = out.slice(0, colon).replace(new RegExp(`\\bwho (${ADDRESS_VERBS})\\b`, 'i'), (m, v) => `you ${CLASSICAL[v.toLowerCase()]}`);
+      out = head + out.slice(colon);
+    }
+    out = out.replace(/\bthine(?=\s+[a-z])/gi, (w) => cap(w, 'your')).replace(/\bthine\b/gi, (w) => cap(w, 'yours'));
+    return out.replace(/\b[A-Za-z]+\b/g, (w) => (CLASSICAL[w.toLowerCase()] ? cap(w, CLASSICAL[w.toLowerCase()]) : w));
+  }).join('\n');
+}
+
 // Blanks for a name or place, which the PDF leaves as gaps.
 const BLANKS = (s) => s
   .replace(/\[(in|and especially|especially|in particular) ?_*\]/g, '[$1 ______]')
@@ -204,6 +234,11 @@ const library = prayers.map((p) => {
     entry.traditional = BLANKS(r.traditional);
     entry.contemporary = BLANKS(r.contemporary);
     if (r.romanArchaic) entry.check = 'traditional words left unrendered';
+  } else if (PRONOUNS.test(r.traditional)) {
+    // Classical: nothing in italics, so the whole prayer is rendered.
+    entry.traditional = BLANKS(r.traditional);
+    entry.contemporary = BLANKS(renderClassical(r.traditional));
+    entry.rendered = 'app';
   } else {
     entry.text = BLANKS(r.traditional);
   }
@@ -219,13 +254,16 @@ if (unknown.size) {
 }
 const counts = { prayer: library.filter((x) => x.kind === 'prayer').length, thanksgiving: library.filter((x) => x.kind === 'thanksgiving').length };
 const both = library.filter((x) => x.contemporary).length;
+const byApp = library.filter((x) => x.rendered === 'app');
 const rows = library.map((e) => `    ${JSON.stringify(e)},`).join('\n');
 await writeFile(out, `// The Book of Common Prayer (1979), Prayers and Thanksgivings (pages 810–841),
 // built by scripts/build-prayers.mjs from the PDF of that section formatted as
 // the original by Satucket Software (satucket.com). Prayers in
 // traditional idiom whose pronouns and verbs the Prayer Book prints in italics
-// also have a contemporary form, rendering just those words. In the text, a
-// new line starts a paragraph, and *…* is the people's response or a rubric.
+// also have a contemporary form, rendering just those words; the classical
+// prayers it leaves unmarked are rendered the same way (rendered: "app"). In
+// the text, a new line starts a paragraph, and *…* is the people's response or
+// a rubric.
 export default {
   source: 'The Book of Common Prayer (1979), Prayers and Thanksgivings',
   prayers: [
@@ -233,7 +271,7 @@ ${rows}
   ],
 };
 `);
-console.log(`${counts.prayer} prayers and ${counts.thanksgiving} thanksgivings; ${both} in both traditional and contemporary forms.`);
+console.log(`${counts.prayer} prayers and ${counts.thanksgiving} thanksgivings; ${both} in both traditional and contemporary forms (${byApp.length} classical ones rendered by the app: ${byApp.map((x) => x.id).join(', ')}).`);
 const flagged = library.filter((x) => x.check);
 if (flagged.length) console.log(`To look at: ${flagged.map((x) => `${x.id} ${x.title} (${x.check})`).join('; ')}`);
 console.log(`Wrote ${out}`);

@@ -35,13 +35,26 @@ test('prayers whose pronouns and verbs the Prayer Book puts in italics come in R
   assert.match(prayerText(PRAYERS.p61, 'contemporary'), /that we may be wholly yours, utterly dedicated to you;/);
   // Names, choices and "he or she" stay as printed.
   assert.match(prayerText(PRAYERS.t11, 'contemporary'), /deliver from his sickness your servant N\., in whose behalf/);
-  // Classical prayers keep the one form the Prayer Book gives them.
-  for (const id of ['p2', 'p7', 'p9', 'p45', 'p65']) {
-    assert.equal(hasBothForms(PRAYERS[id]), false, id);
-    assert.equal(prayerText(PRAYERS[id], 'contemporary'), prayerText(PRAYERS[id], 'traditional'));
-  }
-  assert.equal(Object.values(PRAYERS).filter(hasBothForms).length, 20);
-  // Responses keep their place.
+  assert.equal(Object.values(PRAYERS).filter((p) => hasBothForms(p) && !p.rendered).length, 20);
+  // Responses keep their place, and contemporary prayers have the one form.
+  assert.equal(hasBothForms(PRAYERS.p3), false);
+});
+
+test('the classical prayers the Prayer Book leaves unmarked say you and your in Rite Two too', () => {
+  const classical = Object.values(PRAYERS).filter((p) => p.rendered === 'app').map((p) => p.id);
+  assert.deepEqual(classical, ['p2', 'p7', 'p9', 'p18', 'p45', 'p51', 'p55', 'p65', 'p67', 't9']);
+  const ii = (id) => prayerText(PRAYERS[id], 'contemporary');
+  const i = (id) => prayerText(PRAYERS[id], 'traditional');
+  assert.match(i('p2'), /that thou wouldest be pleased to make thy ways known unto them/);
+  assert.match(ii('p2'), /we humbly beseech you for all sorts and conditions of men; that you would be pleased to make your ways known to them, your saving health to all nations\./);
+  assert.match(ii('p7'), /^Gracious Father, we pray for your holy Catholic Church\..* for the sake of Jesus Christ your Son our Savior\. Amen\.$/);
+  assert.match(ii('p9'), /^Almighty and everlasting God, from whom comes every good and perfect gift: .*the healthful Spirit of your grace; and, that they may truly please you, pour upon them the continual dew of your blessing\./);
+  assert.match(ii('p55'), /^O merciful Father, you have taught us in your holy Word that you do not willingly afflict or grieve the children of men:/);
+  assert.match(ii('p45'), /^Almighty God, our heavenly Father, you set the solitary in families: We commend to your continual care/);
+  assert.match(ii('p65'), /incline your ear to us who have now made our prayers and supplications to you;/);
+  assert.match(ii('p67'), /; who live and reign with the Father and the Holy Spirit, one God, for ever and ever\. Amen\.$/);
+  for (const id of classical) assert.doesNotMatch(ii(id), /\b(thee|thou|thy|thine|hast|dost|wouldest|unto|cometh|passeth|livest|reignest|settest)\b/i, id);
+  assert.equal(Object.values(PRAYERS).filter(hasBothForms).length, 30);
   assert.match(prayerText(PRAYERS.t2), /\n\*We thank you, Lord\.\*\n/);
 });
 

@@ -7,8 +7,9 @@
 // The Prayer Book keeps prayers written in traditional idiom as they are, but
 // prints their pronouns and verbs in italics "to assist in rendering them into
 // contemporary speech". Those prayers come in both forms here (Rite One and
-// Rite Two language, chosen in Settings); the rest have the one form the
-// Prayer Book gives them.
+// Rite Two language, chosen in Settings), and so do the few "classical" ones
+// it leaves unmarked, rendered the same way (you and your, and their verbs).
+// Prayers already in contemporary language have just the one form.
 
 import bcp from './data/prayers.js';
 
@@ -58,8 +59,11 @@ export function prayerText(p, rite = DEFAULT_RITE) {
   return rite === 'traditional' ? p.traditional : p.contemporary;
 }
 
-/** True for a prayer the Prayer Book gives in both languages. */
+/** True for a prayer that can be said in both Rite One and Rite Two language. */
 export const hasBothForms = (p) => !!(p && p.traditional && p.contemporary);
+
+/** True for a classical prayer whose contemporary wording is the app's, not marked in the Prayer Book. */
+export const renderedByApp = (p) => p?.rendered === 'app';
 
 /** Its first words, for a one-line summary. */
 export function firstWords(text, n = 12) {
