@@ -20,8 +20,19 @@ You can rename, reorder, hide or delete any of these, and make more lists of any
 
 - **Today** shows the day as a calendar page: the date, the day's feast or Sunday from
   the Episcopal calendar (with its Proper), and a ribbon in the liturgical colour of the
-  day. Below come your lists, each opening with a prayer from the Book of Common Prayer;
-  tap the prayer to read it in full.
+  day. Then the **Collect of the Day**, and below it your lists, each opening with a
+  prayer from the Book of Common Prayer; tap a prayer to read it in full.
+- **The Collect of the Day** is the Prayer Book's, in Rite One or Rite Two as you choose
+  (pages 159–194 and 211–246), with its heading and page underneath. Sundays, Holy Days
+  and the days of Holy Week and Easter Week have their own. On other weekdays it is the
+  one the Prayer Book appoints: the Sunday's ("The Proper appointed for the Sunday is also
+  used … on the weekdays following"), except that Christmas Day's serves until the First
+  Sunday after Christmas, the Epiphany's until the next Sunday, and Ash Wednesday's and
+  Ascension Day's for the days after them; in the weeks of Pentecost and Trinity Sunday
+  it is the numbered Proper closest to their date (page 158). Christmas Day, Easter Day,
+  Ascension Day and Pentecost give each of their collects, with "or this" between them.
+  Pray-through opens with it. To hide it, turn off **Settings → Prayers → Show the Collect
+  of the Day**. The lesser feasts (Lesser Feasts and Fasts) aren't in it yet.
 - Tap the circle to mark someone prayed for, and they slide away. Undo is on the message
   at the bottom, and **Show prayed** brings checked entries back.
 - **Morning Prayer** comes first on Today: each list you read at the office, as that
@@ -37,8 +48,8 @@ You can rename, reorder, hide or delete any of these, and make more lists of any
   them. Lists that bring everyone every day (daily lists, and Trinity in your own
   prayer) simply repeat, so nothing is carried from them, and neither are Morning
   Prayer lists.
-- **Pray through the list** opens a quiet full-screen view: each list's prayer, then one
-  entry at a time in large type. **Amen** marks it prayed and moves on; **Skip** and
+- **Pray through the list** opens a quiet full-screen view: the Collect of the Day, then
+  each list's prayer and one entry at a time in large type. **Amen** marks it prayed and moves on; **Skip** and
   **Back** (or swipe) move without marking.
 - Use the **filter chips** to see one list at a time. Use **‹ ›** or tap the date to
   look at another day.
@@ -62,14 +73,15 @@ You can rename, reorder, hide or delete any of these, and make more lists of any
   words (say, to name your bishop in *For the Diocese*), write your own, or remove them.
   *Prayer Requests* opens with the prayer from the Great Vigil of Easter ("God and Father
   of all believers…"), then *For All Sorts and Conditions of Men*.
-- **Rite One or Rite Two:** Settings → Prayers → Language. The Prayer Book keeps prayers
-  written in traditional language as they are, but prints their pronouns and verbs in
-  italics "to assist in rendering them into contemporary speech"; those 20 prayers follow
-  your choice, rendering just the italic words. The 10 classical prayers it leaves
-  unmarked (among them For the Church, For Clergy and People, and All Sorts and
-  Conditions) are rendered the same way in Rite Two: you and your for thee, thou, thy and
-  thine, with their verbs to match. Prayers already in contemporary language have just
-  the one form.
+- **Rite One or Rite Two:** Settings → Prayers → Language. The Collect of the Day is as
+  the Prayer Book prints it in each language. Among the Prayers and Thanksgivings, it
+  keeps prayers written in traditional language as they are, but prints their pronouns
+  and verbs in italics "to assist in rendering them into contemporary speech"; those 20
+  prayers follow your choice, rendering just the italic words. The 10 classical prayers
+  it leaves unmarked (among them For the Church, For Clergy and People, and All Sorts
+  and Conditions) are rendered the same way in Rite Two: you and your for thee, thou,
+  thy and thine, with their verbs to match. Prayers already in contemporary language
+  have just the one form.
 - **Prayers and Thanksgivings:** any of the Prayer Book's 70 prayers and 11 thanksgivings
   (pages 810–841) can be prayed one by one each day. **Lists → Prayers and Thanksgivings →
   Choose prayers** (or Settings → Prayers) opens them under the Prayer Book's headings,
@@ -254,7 +266,7 @@ Requires Node 20+ and no dependencies.
 
 ```
 npm start           # serve the app at http://localhost:8080
-npm test            # unit tests: dates, names, cycles, carry-forward, church calendar, importers, storage, the diocese's cycles, sync, PWA files
+npm test            # unit tests: dates, names, cycles, carry-forward, church calendar, collects, importers, storage, the diocese's cycles, sync, PWA files
 npm run test:e2e    # drives the app in Chromium with Playwright; screenshots in tests/e2e/output/
 npm run icons       # re-render the PNG icons from the SVG artwork
 ```
@@ -264,8 +276,11 @@ Layout: `index.html`, `css/app.css`, and ES modules in `js/`:
 - `schedule.js` decides what is due on a date, including cycles and carry-forward.
 - `calendar.js` holds the BCP 1979 calendar (feasts, named Sundays, Propers, transfers),
   with the Prayer Book's own titles (pages 31–33), checked against its calendar and
-  collects;
-  `liturgy.js` works out seasons and Easter.
+  collects, and which collect each day takes; `liturgy.js` works out seasons and Easter.
+- `collects.js` gives the Collect of the Day from `data/collects.js`: the Prayer Book's
+  Collects for the Seasons of the Year and the Holy Days, traditional and contemporary,
+  exactly as printed, built from its two PDFs by
+  `node scripts/build-collects.mjs path/to/colctrad.pdf path/to/collect_contemp.pdf`.
 - `prayers.js` holds the prayers, from `data/prayers.js`: the Prayer Book's Prayers and
   Thanksgivings exactly as printed, built from its PDF by
   `node scripts/build-prayers.mjs path/to/praytnx.pdf`, which also renders the italic

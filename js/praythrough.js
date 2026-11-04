@@ -1,10 +1,12 @@
 // Pray-through: a quiet full-screen view of today's list, one entry at a time.
-// Each list opens with its prayer; "Amen" marks an entry prayed and moves on.
+// It opens with the Collect of the Day, and each list with its prayers;
+// "Amen" marks an entry prayed and moves on.
 
 import { h, icon, replace, prayerBody } from './ui.js';
 import { dayModel, pendingEntries } from './today.js';
 import { prayersFor, itemPrayer, isPrayerItem, DEFAULT_RITE } from './prayers.js';
 import { formatMedium } from './dates.js';
+import { collectFor, collectSource } from './collects.js';
 
 export function openPrayThrough(app) {
   const { store } = app;
@@ -12,6 +14,8 @@ export function openPrayThrough(app) {
   const withPrayers = store.state.settings.showPrayers !== false;
   const rite = store.state.settings.rite || DEFAULT_RITE;
   const cards = [];
+  const collect = store.state.settings.showCollect !== false && collectFor(model.date, rite);
+  if (collect) cards.push({ kind: 'collect', collect });
   for (const { group, entries } of pendingEntries(model)) {
     if (withPrayers) for (const prayer of prayersFor(group.list, rite)) cards.push({ kind: 'prayer', group, prayer });
     for (const e of entries) cards.push({ kind: 'entry', group, ...e, prayer: isPrayerItem(e.item) ? itemPrayer(e.item, rite) : null, prayed: false });
@@ -40,7 +44,13 @@ export function openPrayThrough(app) {
     const n = entryCards.indexOf(card);
     counter.textContent = card.kind === 'entry' ? `${n + 1} of ${entryCards.length}` : card.kind === 'end' ? '' : `${entryCards.length} to pray`;
     let body;
-    if (card.kind === 'prayer') {
+    if (card.kind === 'collect') {
+      body = h('div', { class: 'pray-card pray-prayer pray-collect' },
+        h('p', { class: 'pray-eyebrow' }, 'The Collect of the Day'),
+        h('h2', { class: 'pray-prayer-title' }, card.collect.title),
+        prayerBody(card.collect.text, 'pray-prayer-text'),
+        h('p', { class: 'pray-source' }, collectSource({ ...card.collect, title: null })));
+    } else if (card.kind === 'prayer') {
       body = h('div', { class: 'pray-card pray-prayer' },
         h('p', { class: 'pray-eyebrow' }, eyebrow(card.group)),
         h('h2', { class: 'pray-prayer-title' }, card.prayer.title),

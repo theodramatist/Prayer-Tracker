@@ -694,6 +694,47 @@ await step('the feast of the day and its colour', async () => {
   await page.click('.back-today');
 });
 
+await step('the Collect of the Day, folded above the lists, in Rite Two or Rite One, with its page', async () => {
+  // Monday, November 2: All Saints' Day was the Sunday, and its week takes Proper 26.
+  const c = page.locator('.collect-day');
+  assert.equal(await c.getAttribute('data-collect'), 'proper-26');
+  assert.equal(await c.locator('.prayer-title').innerText(), 'THE COLLECT OF THE DAY');
+  assert.match(await c.locator('.prayer-first').innerText(), /^Almighty and merciful God, it is only by your gift/);
+  assert.equal(await c.locator('.prayer-text').isVisible(), false);
+  await c.locator('summary').click();
+  assert.match(await c.locator('.prayer-text').innerText(), /that we may run without stumbling to obtain your heavenly promises; through Jesus Christ our Lord, who lives and reigns/);
+  assert.equal(await c.locator('.collect-source').innerText(), 'Proper 26 · The Sunday closest to November 2 · page 235');
+  await shot('22-collect');
+  // It stays open from day to day: Saint Andrew's own, then Christmas Day's three, with "or this" between them.
+  await page.evaluate(() => window.prayerTracker.setDate('2026-11-30'));
+  assert.match(await c.locator('.prayer-text').innerText(), /^Almighty God, who gave such grace to your apostle Andrew/);
+  await page.evaluate(() => window.prayerTracker.setDate('2026-12-25'));
+  assert.deepEqual(await texts('.collect-day .prayer-response'), ['or this', 'or this']);
+  assert.equal(await c.locator('.prayer-text p').count(), 5);
+  // In Rite One, as the Prayer Book prints it.
+  await page.click('.tabbar a[href="#/lists"]');
+  await page.click('a[href="#/settings"]');
+  await page.locator('.chips-rite .chip', { hasText: 'Rite One' }).click();
+  await goToday();
+  assert.deepEqual(await texts('.collect-day .prayer-response'), ['or the following', 'or this']);
+  assert.match(await c.locator('.prayer-text p').first().innerText(), /^O God, who makest us glad with the yearly remembrance of the birth of thy only Son/);
+  assert.match(await c.locator('.collect-source').innerText(), /page 160$/);
+  // And it can be turned off.
+  await page.click('.tabbar a[href="#/lists"]');
+  await page.click('a[href="#/settings"]');
+  await page.locator('.chips-rite .chip', { hasText: 'Rite Two' }).click();
+  await page.locator('.toggle-row', { hasText: 'Show the Collect of the Day' }).locator('.toggle-text').click();
+  await goToday();
+  assert.equal(await page.locator('.collect-day').count(), 0);
+  await page.click('.tabbar a[href="#/lists"]');
+  await page.click('a[href="#/settings"]');
+  await page.locator('.toggle-row', { hasText: 'Show the Collect of the Day' }).locator('.toggle-text').click();
+  await goToday();
+  await page.click('.back-today');
+  await c.locator('summary').click(); // folded again
+  assert.equal(await c.locator('.prayer-text').isVisible(), false);
+});
+
 await step('a built-in entry can be reworded (say, after a merger) and restored', async () => {
   await page.locator('.group[data-list=anglican] .item-body').click();
   const sheet = page.locator('.sheet-item');
@@ -771,10 +812,18 @@ await step('missed entries carry forward until prayed, or let go', async () => {
   await eventually(async () => assert.equal(await page.locator('.group[data-list=anglican] .items-carried .item').count(), 1));
 });
 
-await step('pray-through: each list’s prayer, then one entry at a time; Amen marks it prayed', async () => {
+await step('pray-through: the Collect of the Day, each list’s prayer, then one entry at a time; Amen marks it prayed', async () => {
   await page.locator('.btn-pray').click();
   const pray = page.locator('dialog.pray');
   await pray.waitFor();
+  assert.equal(await pray.locator('.pray-eyebrow').innerText(), 'THE COLLECT OF THE DAY');
+  assert.equal(await pray.locator('.pray-prayer-title').innerText(), 'Proper 26');
+  assert.match(await pray.locator('.pray-prayer-text').innerText(), /^Almighty and merciful God, it is only by your gift/);
+  assert.equal(await pray.locator('.pray-source').innerText(), 'The Sunday closest to November 2 · page 235');
+  assert.equal(await pray.locator('.pray-count').innerText(), '3 to pray');
+  await sleep(450);
+  await shot('24-pray-collect');
+  await pray.locator('.btn-amen').click();
   assert.equal(await pray.locator('.pray-prayer-title').innerText(), 'For the Church');
   await shot('25-pray-prayer');
   await pray.locator('.btn-amen').click();

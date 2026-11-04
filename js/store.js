@@ -67,7 +67,7 @@ export function defaultState(now = Date.now(), today = todayKey()) {
     ],
     checks: {},
     tombstones: {},
-    settings: { palette: 'burgundy', foldShortMonths: true, theme: 'auto', showPrayers: true, rite: 'contemporary', updated: 0 },
+    settings: { palette: 'burgundy', foldShortMonths: true, theme: 'auto', showPrayers: true, showCollect: true, rite: 'contemporary', updated: 0 },
     orderUpdated: 0,
     meta: { created: now, lastBackup: null, quickAddList: 'requests', durations: {} },
   };

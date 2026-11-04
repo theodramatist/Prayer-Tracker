@@ -514,6 +514,13 @@ code { font: 0.92em/1 ui-monospace, "SF Mono", Menlo, monospace; padding: 1px 5p
   text-wrap: pretty;
 }
 
+/* The Collect of the Day, folded like a list's prayer, ahead of the lists. */
+.collect-day { margin-top: 20px; }
+.collect-day .prayer { margin: 0 4px; }
+.collect-source, .pray-source { color: var(--text-3); font-size: 13px; line-height: 1.4; }
+.collect-source { margin-top: 8px; }
+.pray-source { margin-top: 16px; }
+
 .items {
   list-style: none;
   margin: 0; padding: 0;

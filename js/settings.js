@@ -221,7 +221,13 @@ export function renderSettings(app) {
         options: RITES.map((r) => ({ value: r.value, label: r.label })),
         onChange: (v) => store.setSetting('rite', v),
       })),
-      h('p', { class: 'hint' }, 'Rite One is traditional language, Rite Two contemporary. In Rite Two, prayers the Prayer Book gives in traditional language say you and your, with their verbs to match: for most, the words it prints in italics; for the few classical ones it leaves unmarked, such as All Sorts and Conditions, the same words throughout.'),
+      h('p', { class: 'hint' }, 'Rite One is traditional language, Rite Two contemporary. The Collect of the Day is as the Prayer Book prints it in each. In Rite Two, prayers it gives only in traditional language say you and your, with their verbs to match: for most, the words it prints in italics; for the few classical ones it leaves unmarked, such as All Sorts and Conditions, the same words throughout.'),
+      toggle({
+        label: 'Show the Collect of the Day',
+        hint: 'On Today, and first in pray-through. On a weekday it’s the one the Prayer Book appoints: the Sunday’s, as a rule, or a Holy Day’s own.',
+        checked: s.showCollect !== false,
+        onChange: (v) => store.setSetting('showCollect', v),
+      }),
       toggle({
         label: 'Show each list’s prayers',
         hint: 'Prayers from the Prayer Book open each list on Today and in pray-through. To change them, open the list and tap ⋯.',

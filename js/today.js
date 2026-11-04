@@ -1,13 +1,15 @@
 // The Today screen: everything due on the chosen date, grouped by list, with
 // anything still owed from earlier days. Checking an entry off makes it slide
-// away; "Show prayed" brings them back. Lists read at Morning Prayer come
-// first, each as one list marked once, apart from your own prayer below.
+// away; "Show prayed" brings them back. The Collect of the Day comes first,
+// then the lists read at Morning Prayer, each as one list marked once, apart
+// from your own prayer below.
 
 import { h, icon, toast, plural, prayerBody } from './ui.js';
 import { agenda, carriedOver, endLabel, entryCount, officeFor } from './schedule.js';
 import { formatDate, formatLong, formatMedium, formatWithYear, diffDays } from './dates.js';
 import { dayTitle } from './calendar.js';
 import { prayersFor, itemPrayer, isPrayerItem, firstWords, DEFAULT_RITE } from './prayers.js';
+import { collectFor, collectSource } from './collects.js';
 import { openAddSheet, openItemSheet, openImportSheet, openPrayerPicker, loadSeed, ACP_URL } from './sheets.js';
 import { seedFor } from './seeds.js';
 import { openPrayThrough } from './praythrough.js';
@@ -114,6 +116,7 @@ export function renderToday(app) {
     nothing && h('section', { class: 'empty-card' },
       h('p', { class: 'empty-title' }, 'Nothing on your lists for this day.'),
       h('p', null, 'Tap ', h('span', { class: 'inline-plus', 'aria-label': 'plus' }, '+'), ' to add a name or a prayer request.')),
+    app.filter === 'all' && collectBlock(app, date),
     office.length > 0 && morningPrayer(app, office, model),
     ...shown,
     done > 0 && h('div', { class: 'show-done' },
@@ -196,24 +199,36 @@ function filterChips(app, groups, model) {
     withItems.map((g) => chip(g.list.id, g.list.name, left(g))));
 }
 
+/** A prayer folded until tapped, which stays open (or shut) as you move about. */
+function foldedPrayer(app, key, title, text, ...after) {
+  app.openPrayers ||= new Set();
+  const summary = h('summary', null, h('span', { class: 'prayer-title' }, title), h('span', { class: 'prayer-first' }, firstWords(text, 40)));
+  const el = h('details', { class: 'prayer', open: app.openPrayers.has(key) }, summary, prayerBody(text), ...after);
+  // Remember it at the tap itself (the toggle event comes a moment later).
+  summary.addEventListener('click', () => {
+    if (el.open) app.openPrayers.delete(key);
+    else app.openPrayers.add(key);
+  });
+  return el;
+}
+
+/** The Collect of the Day, in the language chosen in Settings, with where to find it. */
+function collectBlock(app, date) {
+  const { settings } = app.store.state;
+  if (settings.showCollect === false) return null;
+  const c = collectFor(date, settings.rite || DEFAULT_RITE);
+  if (!c) return null;
+  return h('section', { class: 'collect-day', 'aria-label': 'The Collect of the Day', 'data-collect': c.id },
+    foldedPrayer(app, 'collect', 'The Collect of the Day', c.text, h('p', { class: 'collect-source' }, collectSource(c))));
+}
+
 /** The prayers a list opens with, each folded until tapped. */
 function prayerBlock(app, list) {
   const { settings } = app.store.state;
   if (settings.showPrayers === false) return null;
   const prayers = prayersFor(list, settings.rite || DEFAULT_RITE);
   if (!prayers.length) return null;
-  app.openPrayers ||= new Set();
-  return prayers.map((p, k) => {
-    const id = `${list.id}:${k}`;
-    const summary = h('summary', null, h('span', { class: 'prayer-title' }, p.title), h('span', { class: 'prayer-first' }, firstWords(p.text, 40)));
-    const el = h('details', { class: 'prayer', open: app.openPrayers.has(id) }, summary, prayerBody(p.text));
-    // Remember it at the tap itself (the toggle event comes a moment later).
-    summary.addEventListener('click', () => {
-      if (el.open) app.openPrayers.delete(id);
-      else app.openPrayers.add(id);
-    });
-    return el;
-  });
+  return prayers.map((p, k) => foldedPrayer(app, `${list.id}:${k}`, p.title, p.text));
 }
 
 function groupSection(app, g, model) {
