@@ -221,7 +221,7 @@ button { cursor: pointer; }
 code { font: 0.92em/1 ui-monospace, "SF Mono", Menlo, monospace; padding: 1px 5px; border-radius: 6px; background: var(--surface-2); }
 
 /* Small capitals in the rubric colour: the prayer-book voice for labels. */
-.rubric, .day-rel, .group-label, .field-label, .pray-eyebrow, .carried-head, .detail-head .count, .prayer-title, .feast-detail {
+.rubric, .day-rel, .group-label, .field-label, .pray-eyebrow, .carried-head, .detail-head .count, .prayer-title, .feast-detail, .office-head {
   font-family: var(--font-sans);
   font-size: 12px;
   font-weight: 650;
@@ -588,6 +588,33 @@ code { font: 0.92em/1 ui-monospace, "SF Mono", Menlo, monospace; padding: 1px 5p
 }
 .badge-warn { background: var(--warn-bg); color: var(--warn-text); }
 .badge-from { background: var(--accent-soft); color: var(--accent); }
+
+/* Morning Prayer: lists read aloud in the office, each marked once. */
+.office { margin-top: 24px; }
+.office-head { color: var(--accent); padding: 0 4px 8px; }
+.office-list {
+  padding: 14px 16px 10px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+}
+.office-list + .office-list { margin-top: 12px; }
+.office-title { display: flex; align-items: baseline; gap: 10px; }
+.office-title h2 { font-size: 22px; line-height: 1.2; min-width: 0; }
+.office-title .group-count { margin-left: auto; align-self: center; }
+.office-names {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  columns: 2 9.5em;
+  column-gap: 20px;
+  font-size: 16px;
+  line-height: 1.55;
+}
+.office-names li { break-inside: avoid; }
+.office-foot { display: flex; justify-content: flex-end; margin-top: 10px; }
+.office-list.done .office-names { color: var(--text-3); }
 
 /* "Prayed for all": a list read out in one go. */
 .group-foot { display: flex; justify-content: flex-end; padding: 2px 4px 0; }

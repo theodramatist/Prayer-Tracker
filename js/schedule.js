@@ -2,7 +2,9 @@
 //
 // List types:
 //   daily   – every item, every day (each item may have a start/end date)
-//   weekly  – item.day is the weekday, 0 = Sunday … 6 = Saturday
+//   weekly  – item.day is the weekday, 0 = Sunday … 6 = Saturday. With
+//             `everyDay`, everyone also comes up every day in your own
+//             prayer, while each weekday's names stay a list of their own.
 //   monthly – item.day is the day of the month, 1 … 31
 //   dated   – item.date is one specific date
 //   cycle   – one entry per day from a start date, starting over at the end
@@ -137,6 +139,7 @@ export function itemsDue(list, dateKey, { foldShortMonths = true } = {}) {
       due = list.items.filter((i) => isActive(i, dateKey));
       break;
     case 'weekly': {
+      if (list.everyDay) { due = list.items.filter((i) => isActive(i, dateKey)); break; }
       const wd = weekday(dateKey);
       due = list.items.filter((i) => i.day === wd && isActive(i, dateKey));
       break;
@@ -166,7 +169,7 @@ export function itemsDue(list, dateKey, { foldShortMonths = true } = {}) {
 export function cycleLabel(list, dateKey, { foldShortMonths = true } = {}) {
   switch (list.type) {
     case 'weekly':
-      return WEEKDAYS[weekday(dateKey)];
+      return list.everyDay ? 'Every day' : WEEKDAYS[weekday(dateKey)];
     case 'monthly': {
       const days = monthDaysFor(dateKey, foldShortMonths);
       return days.length > 1 ? `Days ${days[0]}–${days[days.length - 1]}` : `Day ${days[0]}`;
@@ -207,7 +210,8 @@ export function carriedOver(state, today, isChecked, { lookback = 60 } = {}) {
   const opts = { foldShortMonths: state.settings?.foldShortMonths !== false };
   const out = new Map();
   for (const list of state.lists) {
-    if (list.hidden || list.type === 'daily') continue;
+    // Lists that bring everyone every day have nothing to carry.
+    if (list.hidden || list.type === 'daily' || (list.type === 'weekly' && list.everyDay)) continue;
     const seen = new Set(itemsDue(list, today, opts).map((i) => i.id));
     const since = list.since || '0000-00-00';
     let carried = [];
@@ -257,6 +261,35 @@ export function agenda(state, dateKey, { carried = null } = {}) {
     groups.push(group);
   }
   return groups;
+}
+
+/** A weekly list's names for one weekday, whatever else the list brings that day. */
+export function dayListFor(list, dateKey) {
+  if (list.type !== 'weekly') return [];
+  const wd = weekday(dateKey);
+  return sortItems(list, list.items.filter((i) => i.day === wd && isActive(i, dateKey)));
+}
+
+/** The check that marks a list read at Morning Prayer, once for the whole list. */
+export const officeId = (list) => `office:${list.id}`;
+
+/**
+ * Lists read at Morning Prayer on dateKey (list.morningPrayer): each one's
+ * entries for the day, read out as a list and checked off once, apart from
+ * praying for each entry in your own prayer. For a weekly list, the names of
+ * that weekday. Lists with nothing that day are left out.
+ */
+export function officeFor(state, dateKey) {
+  const opts = { foldShortMonths: state.settings?.foldShortMonths !== false };
+  const out = [];
+  for (const list of state.lists) {
+    if (list.hidden || !list.morningPrayer) continue;
+    const weekly = list.type === 'weekly';
+    const items = weekly ? dayListFor(list, dateKey) : itemsDue(list, dateKey, opts);
+    if (!items.length) continue;
+    out.push({ list, items, id: officeId(list), label: weekly ? WEEKDAYS[weekday(dateKey)] : cycleLabel(list, dateKey, opts) });
+  }
+  return out;
 }
 
 /** Text for an item's end date relative to dateKey: "Last day", "Until Nov 9", or ''. */

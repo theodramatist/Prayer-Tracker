@@ -1,9 +1,10 @@
 // The Today screen: everything due on the chosen date, grouped by list, with
 // anything still owed from earlier days. Checking an entry off makes it slide
-// away; "Show prayed" brings them back.
+// away; "Show prayed" brings them back. Lists read at Morning Prayer come
+// first, each as one list marked once, apart from your own prayer below.
 
 import { h, icon, toast, plural } from './ui.js';
-import { agenda, carriedOver, endLabel, entryCount } from './schedule.js';
+import { agenda, carriedOver, endLabel, entryCount, officeFor } from './schedule.js';
 import { formatDate, formatLong, formatMedium, formatWithYear, diffDays } from './dates.js';
 import { dayTitle } from './calendar.js';
 import { prayerFor } from './prayers.js';
@@ -33,9 +34,15 @@ export function dayModel(app) {
   const checked = (d, id) => store.isChecked(d, id);
   const carried = isToday ? carriedOver(store.state, date, checked) : null;
   const groups = agenda(store.state, date, { carried });
+  // Lists read at Morning Prayer: one check each, apart from the entries' own.
+  const office = officeFor(store.state, date);
   let total = 0;
   let done = 0;
   let owed = 0;
+  for (const o of office) {
+    total += 1;
+    if (checked(date, o.id)) done += 1;
+  }
   for (const g of groups) {
     for (const i of g.items) {
       total += 1;
@@ -43,7 +50,7 @@ export function dayModel(app) {
     }
     owed += g.carried.length;
   }
-  return { date, isToday, groups, total, done, owed, checked };
+  return { date, isToday, groups, office, total, done, owed, checked };
 }
 
 /** The entries still to pray, in order: each list's own, then what it carried over. */
@@ -86,7 +93,11 @@ export function renderToday(app) {
     ? sections.filter((el) => !el.classList.contains('group'))
     : sections;
   const nothing = total === 0 && owed === 0 && !groups.some((g) => g.needsSetup || g.cycleEnded);
-  const toPray = total - done + owed;
+  // Pray-through is for your own prayer, so Morning Prayer lists aren't in it.
+  const toPray = pendingEntries(model).reduce((n, x) => n + x.entries.length, 0);
+  const office = model.office
+    .filter((o) => app.filter === 'all' || o.list.id === app.filter)
+    .filter((o) => app.showDone || !model.checked(date, o.id));
 
   return [
     dayHeader(app, date),
@@ -103,6 +114,7 @@ export function renderToday(app) {
     nothing && h('section', { class: 'empty-card' },
       h('p', { class: 'empty-title' }, 'Nothing on your lists for this day.'),
       h('p', null, 'Tap ', h('span', { class: 'inline-plus', 'aria-label': 'plus' }, '+'), ' to add a name or a prayer request.')),
+    office.length > 0 && morningPrayer(app, office, model),
     ...shown,
     done > 0 && h('div', { class: 'show-done' },
       h('button', {
@@ -168,9 +180,10 @@ function progress(done, total, owed) {
 }
 
 function filterChips(app, groups, model) {
-  const withItems = groups.filter((g) => g.items.length || g.carried.length || g.list.id === app.filter);
+  const officeLeft = new Map(model.office.map((o) => [o.list.id, model.checked(model.date, o.id) ? 0 : 1]));
+  const withItems = groups.filter((g) => g.items.length || g.carried.length || officeLeft.has(g.list.id) || g.list.id === app.filter);
   if (withItems.length < 2 && app.filter === 'all') return null;
-  const left = (g) => g.items.filter((i) => !model.checked(model.date, i.id)).length + g.carried.length;
+  const left = (g) => g.items.filter((i) => !model.checked(model.date, i.id)).length + g.carried.length + (officeLeft.get(g.list.id) || 0);
   const totalLeft = withItems.reduce((n, g) => n + left(g), 0);
   const chip = (value, label, count) => h('button', {
     type: 'button',
@@ -218,7 +231,39 @@ function groupSection(app, g, model) {
     app.showDone && done.length > 0 && h('ul', { class: 'items items-done' }, done.map((i) => itemRow(app, g.list, i, true))));
 }
 
-/** For a list read out in one go (say, at Morning Prayer): mark everyone on it at once. */
+/**
+ * Morning Prayer: each list read there today, names only (notes stay private),
+ * marked prayed once for the whole list. Your own check-offs of the same
+ * people are separate and unaffected.
+ */
+function morningPrayer(app, offices, model) {
+  return h('section', { class: 'office', 'aria-label': 'Morning Prayer' },
+    h('p', { class: 'office-head' }, 'Morning Prayer'),
+    offices.map((o) => officeList(app, o, model)));
+}
+
+function officeList(app, o, model) {
+  const { store } = app;
+  const date = model.date;
+  const done = model.checked(date, o.id);
+  const mark = (value) => {
+    store.setChecked(date, o.id, value);
+    if (value) toast(`${o.list.name}: prayed at Morning Prayer`, { action: 'Undo', onAction: () => store.setChecked(date, o.id, false) });
+  };
+  return h('div', { class: `office-list ${done ? 'done' : ''}`, 'data-office': o.list.id },
+    h('header', { class: 'office-title' },
+      h('h2', null, o.list.name),
+      o.label && h('span', { class: 'group-label' }, o.label),
+      h('span', { class: `group-count ${done ? 'all-done' : ''}`, 'aria-label': done ? 'prayed' : plural(o.items.length, 'name') },
+        done ? icon('check') : String(o.items.length))),
+    h('ol', { class: 'office-names' }, o.items.map((i) => h('li', null, i.text))),
+    h('div', { class: 'office-foot' },
+      done
+        ? h('button', { class: 'btn btn-quiet btn-sm', type: 'button', onclick: () => mark(false) }, 'Not prayed yet')
+        : h('button', { class: 'btn btn-primary btn-sm btn-office', type: 'button', onclick: () => mark(true) }, icon('check'), 'Prayed at Morning Prayer')));
+}
+
+/** For a list read out in one go: mark everyone on it at once. */
 function allPrayed(app, items, date) {
   const pairs = items.map((i) => [date, i.id]);
   return h('div', { class: 'group-foot' },

@@ -91,7 +91,13 @@ const short = (s, n = 42) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
 /** Best weekday for a new name: its alphabetical slot if the list is spread A–Z, else the emptiest day in use. */
 export function suggestWeekday(list, text, fallbackDate) {
-  if (!list.items.length) return weekday(fallbackDate);
+  // The days chosen when the list was spread; a list read at Morning Prayer starts on weekdays.
+  const allowed = Array.isArray(list.spreadDays) && list.spreadDays.length ? list.spreadDays : null;
+  if (!list.items.length) {
+    const d = weekday(fallbackDate);
+    const days = allowed || (list.morningPrayer ? [1, 2, 3, 4, 5] : null);
+    return !days || days.includes(d) ? d : days[0];
+  }
   const sorted = sortItems({ ...list, sort: 'last' }, list.items);
   const days = sorted.map((i) => i.day);
   const alphabetical = days.every((d, k) => k === 0 || d >= days[k - 1]);
@@ -103,8 +109,8 @@ export function suggestWeekday(list, text, fallbackDate) {
   }
   const counts = Array(7).fill(0);
   for (const i of list.items) counts[i.day] = (counts[i.day] || 0) + 1;
-  const used = counts.map((c, d) => [c, d]).filter(([c]) => c > 0);
-  const pool = used.length ? used : counts.map((c, d) => [c, d]);
+  const used = counts.map((c, d) => [c, d]).filter(([c, d]) => c > 0 && (!allowed || allowed.includes(d)));
+  const pool = used.length ? used : counts.map((c, d) => [c, d]).filter(([, d]) => !allowed || allowed.includes(d));
   return pool.reduce((best, cur) => (cur[0] < best[0] ? cur : best))[1];
 }
 
@@ -251,7 +257,10 @@ export function openAddSheet(app, { text = '', listId = null, date = null, day: 
         untilField));
     } else if (list.type === 'weekly') {
       if (day == null) day = suggestWeekday(list, textarea.value, start);
-      parts.push(field('Day of the week', weekdayPicker(list, day, (v) => { day = v; dayTouched = true; })));
+      parts.push(field(list.morningPrayer ? 'Morning Prayer day' : 'Day of the week', weekdayPicker(list, day, (v) => { day = v; dayTouched = true; }),
+        list.morningPrayer && h('p', { class: 'hint' }, list.everyDay
+          ? 'On that day’s Morning Prayer list, and in your own prayer every day.'
+          : 'On that day’s Morning Prayer list.')));
     } else if (list.type === 'monthly') {
       parts.push(field('Day of the month', monthDayPicker(list, monthDay, (v) => { monthDay = v; })));
     } else if (list.type === 'dated') {
@@ -366,7 +375,7 @@ export function openItemSheet(app, itemId, { list: inList = null, entry = null }
     const parts = [];
     if (target.type === 'weekly') {
       if (!(day >= 0 && day <= 6)) day = suggestWeekday(target, text.value, app.viewDate);
-      parts.push(field('Day of the week', weekdayPicker(target, day, (v) => { day = v; })));
+      parts.push(field(target.morningPrayer ? 'Morning Prayer day' : 'Day of the week', weekdayPicker(target, day, (v) => { day = v; })));
     } else if (target.type === 'monthly') {
       if (!(day >= 1 && day <= 31)) day = suggestMonthDay(target, app.viewDate);
       parts.push(field('Day of the month', monthDayPicker(target, day, (v) => { day = v; })));
@@ -747,6 +756,8 @@ export function openListSheet(app, listId = null) {
   let type = existing?.type || 'daily';
   let sort = existing?.sort || 'added';
   let hidden = !!existing?.hidden;
+  let morningPrayer = !!existing?.morningPrayer;
+  let everyDay = !!existing?.everyDay;
 
   const name = h('input', { class: 'input input-lg', value: existing?.name || '', placeholder: 'e.g. Godchildren', 'aria-label': 'List name', enterkeyhint: 'done' });
   const typeField = existing ? null : field('Repeats',
@@ -800,6 +811,20 @@ export function openListSheet(app, listId = null) {
       onChange: (v) => { sort = v; },
     })),
     existing && toggle({ label: 'Show on Today', checked: !hidden, onChange: (v) => { hidden = !v; } }),
+    existing && toggle({
+      label: 'Read at Morning Prayer',
+      hint: existing.type === 'weekly'
+        ? 'Each weekday’s names also come up on Today as one list to read aloud, marked once for the whole list. Names only; notes stay private.'
+        : 'The day’s entries also come up on Today as one list to read aloud, marked once for the whole list. Names only; notes stay private.',
+      checked: morningPrayer,
+      onChange: (v) => { morningPrayer = v; },
+    }),
+    existing?.type === 'weekly' && toggle({
+      label: 'Everyone, every day, in my own prayer',
+      hint: 'Everyone on the list comes up every day to pray for one by one, apart from Morning Prayer. Off: only that day’s names.',
+      checked: everyDay,
+      onChange: (v) => { everyDay = v; },
+    }),
     prayer?.el,
     builtinBack,
     seedBack,
@@ -812,6 +837,8 @@ export function openListSheet(app, listId = null) {
     if (!value) { name.focus(); return; }
     if (existing) {
       const patch = { name: value, sort, hidden };
+      if (morningPrayer !== !!existing.morningPrayer) patch.morningPrayer = morningPrayer;
+      if (existing.type === 'weekly' && everyDay !== !!existing.everyDay) patch.everyDay = everyDay;
       if (prayer.changed()) patch.prayer = prayer.value();
       store.updateList(existing.id, patch);
       sheet.close();

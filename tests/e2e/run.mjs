@@ -201,8 +201,13 @@ await step('Trinity: paste names with day headers, sorted by last name', async (
   await sheet.locator('button[type=submit]').click();
   await sheet.waitFor({ state: 'detached' });
   await goToday();
-  assert.equal(await page.locator('.group[data-list=trinity] .group-label').innerText(), 'MONDAY');
-  assert.deepEqual(await texts('.group[data-list=trinity] .item-text'), ['Bob Carter', 'Maria de la Cruz', 'Tom Smith', 'Ann Zeller']);
+  // Monday's names are read at Morning Prayer as one list…
+  assert.equal(await page.locator('.office-list[data-office=trinity] .group-label').innerText(), 'MONDAY');
+  assert.deepEqual(await texts('.office-list[data-office=trinity] .office-names li'), ['Bob Carter', 'Maria de la Cruz', 'Tom Smith', 'Ann Zeller']);
+  // …and everyone comes up every day in your own prayer.
+  assert.equal(await page.locator('.group[data-list=trinity] .group-label').innerText(), 'EVERY DAY');
+  assert.deepEqual(await texts('.group[data-list=trinity] .item-text'),
+    ['Mary Adams', 'John & Sue Baker', 'Bob Carter', 'Lee Chen', 'Maria de la Cruz', "Pat O'Brien", 'Tom Smith', 'Ann Zeller']);
 });
 
 await step('Trinity: add "First Last" and it slots in by last name', async () => {
@@ -232,6 +237,33 @@ await step('Trinity: spread everyone over the week alphabetically', async () => 
   }
   assert.deepEqual(order, ['Mary Adams', 'John & Sue Baker', 'Grace Brown', 'Bob Carter', 'Lee Chen', 'Maria de la Cruz', "Pat O'Brien", 'Tom Smith', 'Ann Zeller']);
   await shot('05-trinity-list');
+});
+
+await step('Trinity: Morning Prayer reads the day’s list; your own prayer has everyone, kept separate', async () => {
+  await goToday();
+  const office = page.locator('.office-list[data-office=trinity]');
+  assert.equal(await page.locator('.office .office-head').innerText(), 'MORNING PRAYER');
+  assert.deepEqual(await texts('.office-list[data-office=trinity] .office-names li'), ['Mary Adams', 'John & Sue Baker']);
+  assert.equal(await page.locator('.group[data-list=trinity] .item').count(), 9);
+  await shot('05d-morning-prayer');
+  // Praying for someone privately doesn't touch the Morning Prayer list…
+  await page.locator('.group[data-list=trinity] .item', { hasText: 'Mary Adams' }).locator('.check').click();
+  await eventually(async () => assert.equal(await page.locator('.group[data-list=trinity] .item', { hasText: 'Mary Adams' }).count(), 0));
+  assert.deepEqual(await texts('.office-list[data-office=trinity] .office-names li'), ['Mary Adams', 'John & Sue Baker']);
+  // …and marking the list prayed at Morning Prayer leaves everyone on it to pray for privately.
+  await office.locator('.btn-office').click();
+  await eventually(async () => assert.equal(await page.locator('.office-list[data-office=trinity]').count(), 0));
+  assert.match(await page.locator('.toast.show').innerText(), /Trinity: prayed at Morning Prayer/);
+  assert.equal(await page.locator('.group[data-list=trinity] .item', { hasText: 'John & Sue Baker' }).count(), 1);
+  await page.locator('.toast.show .toast-action').click();
+  await eventually(async () => assert.equal(await page.locator('.office-list[data-office=trinity]').count(), 1));
+  // A name added to the list goes onto its Morning Prayer day, and into your prayer every day.
+  await quickAdd('Zack Zimmer', { list: 'Trinity' });
+  assert.equal(await page.locator('.group[data-list=trinity] .item', { hasText: 'Zack Zimmer' }).count(), 1);
+  await page.evaluate(() => window.prayerTracker.setDate('2026-11-07'));
+  assert.deepEqual(await texts('.office-list[data-office=trinity] .office-names li'), ['Ann Zeller', 'Zack Zimmer']);
+  assert.equal(await page.locator('.office-list[data-office=trinity] .group-label').innerText(), 'SATURDAY');
+  await page.evaluate(() => window.prayerTracker.setDate('2026-11-02'));
 });
 
 await step('a member directory (CSV) with preferred names is spread over Monday to Friday', async () => {
@@ -476,9 +508,12 @@ await step('midnight rollover moves Today forward', async () => {
   await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
   await eventually(async () => assert.equal(await heading(), 'Tuesday, November 3'));
   assert.equal(await page.locator('.day-rel').innerText(), 'TODAY');
-  // Monday's unprayed cycle entries are carried into Tuesday.
-  assert.deepEqual(await texts('.group[data-list=trinity] .items-carried .item-text'), ['Mary Adams', 'John & Sue Baker']);
+  // Monday's unprayed cycle entries are carried into Tuesday. Trinity brings
+  // everyone every day, so nothing of it is carried, and Tuesday's Morning
+  // Prayer list is Tuesday's names.
   assert.deepEqual(await texts('.group[data-list=anglican] .items-carried .item-text'), ['The Diocese of Delta – (Example)']);
+  assert.equal(await page.locator('.group[data-list=trinity] .items-carried').count(), 0);
+  assert.deepEqual(await texts('.office-list[data-office=trinity] .office-names li'), ['Grace Brown']);
   assert.equal(await page.locator('.group[data-list=family] .items-carried').count(), 0); // daily lists just repeat
   await shot('08b-carried');
   await page.clock.setFixedTime(new Date('2026-11-02T09:00:00-05:00'));
@@ -489,6 +524,12 @@ await step('midnight rollover moves Today forward', async () => {
 await step('all prayed shows a closing response', async () => {
   await page.evaluate(() => window.prayerTracker.setDate('2026-11-04'));
   for (;;) {
+    const office = page.locator('.btn-office');
+    if (await office.count()) {
+      await office.first().click();
+      await sleep(80);
+      continue;
+    }
     const checks = page.locator('.items:not(.items-done) .item:not(.checked) .check');
     if (!(await checks.count())) break;
     await checks.first().click();
@@ -682,6 +723,16 @@ await step('a list’s prayer can be changed to another, or to your own words', 
 });
 
 await step('missed entries carry forward until prayed, or let go', async () => {
+  // As a plain weekly list (just each day's names), Trinity carries what's missed.
+  await openList('trinity');
+  await page.locator('button[aria-label="List settings"]').click();
+  const settings = page.locator('.sheet-list');
+  await settings.waitFor();
+  await settings.locator('.toggle-row', { hasText: 'Everyone, every day' }).locator('label').click();
+  await settings.locator('button[type=submit]').click();
+  await settings.waitFor({ state: 'detached' });
+  assert.doesNotMatch(await page.locator('.list-sub').innerText(), /every day/);
+  await goToday();
   await quickAdd('Ann Able', { list: 'Trinity' }); // goes on Monday
   await page.clock.setFixedTime(new Date('2026-11-03T09:00:00-05:00'));
   await page.reload();

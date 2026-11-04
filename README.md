@@ -11,7 +11,7 @@ It keeps several kinds of cycle, and shows everything due on a given day in one 
 | **Anglican Cycle of Prayer** | a different diocese or province each day, starting over at the end | *Anglican Cycle of Prayer*, built in: nothing to set up |
 | **Diocesan cycle** | a different church each day of the month (1–31) | *Diocesan Cycle*: the Episcopal Diocese of Wisconsin's 97 churches, each with its clergy |
 | **Diocesan daily cycle** | one name for each date of the year | *Diocesan Daily Cycle*: the diocese's 2026 Daily Cycle of Prayer |
-| **Parish cycle** | a different list of names each day of the week | *Trinity*: import the member list, or type names First Last; they sort by last name |
+| **Parish cycle** | a list of names for each weekday, read at Morning Prayer, and everyone every day in your own prayer | *Trinity*: import the member list, or type names First Last; they sort by last name |
 | **Daily** | every day, either ongoing or for a set time you choose when adding | *Prayer Requests*, *Family*, *Clergy* |
 
 You can rename, reorder, hide or delete any of these, and make more lists of any type.
@@ -24,12 +24,19 @@ You can rename, reorder, hide or delete any of these, and make more lists of any
   tap the prayer to read it in full.
 - Tap the circle to mark someone prayed for, and they slide away. Undo is on the message
   at the bottom, and **Show prayed** brings checked entries back.
-- **Prayed for all** under a list marks everyone on it at once: for a list read out in
-  one go, such as the day's Trinity names at Morning Prayer.
+- **Morning Prayer** comes first on Today: each list you read at the office, as that
+  day's names (no notes, which stay private), with **Prayed at Morning Prayer** to mark
+  the whole list once. It is kept apart from your own prayer below: marking the list
+  checks no one off there, and checking someone off there leaves the list as it is.
+  Any list can be read at Morning Prayer (open it, tap **⋯**, **Read at Morning
+  Prayer**); *Trinity* comes that way.
+- **Prayed for all** under a list marks everyone on it at once.
 - **Missed a day?** Cycle entries you didn't check off (the Anglican diocese, the
-  diocesan church, the Trinity names) stay on Today under **From earlier days**, with
-  their date, until you pray for them or come round to them again. **Let these go**
-  clears them. Daily lists simply repeat, so nothing is carried from them.
+  diocesan churches and clergy) stay on Today under **From earlier days**, with their
+  date, until you pray for them or come round to them again. **Let these go** clears
+  them. Lists that bring everyone every day (daily lists, and Trinity in your own
+  prayer) simply repeat, so nothing is carried from them, and neither are Morning
+  Prayer lists.
 - **Pray through the list** opens a quiet full-screen view: each list's prayer, then one
   entry at a time in large type. **Amen** marks it prayed and moves on; **Skip** and
   **Back** (or swipe) move without marking.
@@ -131,8 +138,15 @@ so no church is missed. You can turn this off in Settings.
 contents). It reads the *First Name* and *Last Name* columns and, where it's filled in,
 uses the *Preferred Name* instead of the first name. Leave **Spread A–Z** chosen with
 Monday to Friday, and everyone is put in last-name order and divided into five even
-lists, with people who share a last name on the same day. Each weekday's names then come
-up on Today, to read at Morning Prayer and check off one by one (or all at once).
+lists, with people who share a last name on the same day.
+
+Trinity then works in two parts. **At Morning Prayer**, each weekday's names come up at
+the top of Today as that day's list, to read aloud and mark once. **In your own
+prayer**, everyone on the list comes up every day, to pray for one by one or with
+**Pray through the list**; nothing is carried from day to day, since everyone is there
+again tomorrow. A name you add goes on its Morning Prayer day by last name, and into
+your own prayer every day. In the list's settings (**⋯**) you can turn either part off:
+without **Everyone, every day**, your own prayer has only that day's names.
 
 You can also paste names one per line, as `First Last` or `Last, First`. Put a
 day name on its own line to start that day's names:

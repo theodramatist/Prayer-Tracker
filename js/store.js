@@ -57,7 +57,8 @@ export function defaultState(now = Date.now(), today = todayKey()) {
       list({ id: 'anglican', name: 'Anglican Cycle of Prayer', type: 'cycle', kind: 'acp', source: 'acp' }),
       list({ id: 'diocese', name: 'Diocesan Cycle', type: 'monthly' }),
       list({ id: 'diocese-daily', name: 'Diocesan Daily Cycle', type: 'dated' }),
-      list({ id: 'trinity', name: 'Trinity', type: 'weekly', sort: 'last' }),
+      // Read at Morning Prayer a weekday at a time; in your own prayer, everyone every day.
+      list({ id: 'trinity', name: 'Trinity', type: 'weekly', sort: 'last', morningPrayer: true, everyDay: true }),
       list({ id: 'requests', name: 'Prayer Requests', type: 'daily' }),
       list({ id: 'family', name: 'Family', type: 'daily' }),
       list({ id: 'clergy', name: 'Clergy', type: 'daily', sort: 'last' }),
@@ -93,6 +94,13 @@ export function migrate(data, now = Date.now(), today = todayKey()) {
       if (fromV1 && l.kind === 'acp' && l.type === 'dated' && !list.items.length) {
         list.type = 'cycle';
         list.source = 'acp';
+      }
+      // Before 2.3 the parish list was only a weekly list. It is now read at
+      // Morning Prayer, with everyone every day in your own prayer, unless
+      // you have chosen otherwise.
+      if (l.id === 'trinity' && l.type === 'weekly' && l.morningPrayer === undefined && l.everyDay === undefined) {
+        list.morningPrayer = true;
+        list.everyDay = true;
       }
       return list;
     });
@@ -597,7 +605,7 @@ export class Store {
     return this.commit(() => {
       const list = this.list(listId);
       if (!list) return null;
-      for (const key of ['name', 'sort', 'hidden', 'prayer']) if (key in patch) list[key] = patch[key];
+      for (const key of ['name', 'sort', 'hidden', 'prayer', 'morningPrayer', 'everyDay']) if (key in patch) list[key] = patch[key];
       if (!list.hidden) delete list.hidden;
       if (list.prayer === undefined) delete list.prayer;
       list.updated = this.stamp();

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { Store, STORAGE_KEY, migrate, defaultState, stampAsNewest } from '../../js/store.js';
-import { itemsDue, endDateFor, carriedOver, builtinEntries, cycleSource } from '../../js/schedule.js';
+import { itemsDue, endDateFor, carriedOver, builtinEntries, cycleSource, dayListFor, officeFor } from '../../js/schedule.js';
 import { BUNDLES } from '../../js/bundles.js';
 import { weekday } from '../../js/dates.js';
 
@@ -126,7 +126,7 @@ test('distribute a weekly list alphabetically, keeping shared last names togethe
     'Hal Fox', 'Ivy Green', 'Jo Hill', 'Kim Irwin', 'Lu Jones', 'Mo King', 'Ned Lee'];
   store.addItems('trinity', names.map((text) => ({ text })));
   store.distributeWeekly('trinity', [0, 1, 2, 3, 4, 5, 6]);
-  const byDay = Array.from({ length: 7 }, (_, d) => itemsDue(store.list('trinity'), `2026-11-0${d + 1}`).map((i) => i.text));
+  const byDay = Array.from({ length: 7 }, (_, d) => dayListFor(store.list('trinity'), `2026-11-0${d + 1}`).map((i) => i.text));
   // 2026-11-01 is a Sunday, so index 0 = Sunday. The Bakers stay together, on
   // whichever side of the cut keeps the days most even.
   assert.deepEqual(byDay.map((d) => d.length), [1, 3, 2, 2, 2, 2, 2]);
@@ -136,11 +136,11 @@ test('distribute a weekly list alphabetically, keeping shared last names togethe
   // Left to itself it uses Monday to Friday, and remembers the days chosen.
   store.distributeWeekly('trinity');
   assert.deepEqual(store.list('trinity').spreadDays, [1, 2, 3, 4, 5]);
-  const weekdays = Array.from({ length: 7 }, (_, d) => itemsDue(store.list('trinity'), `2026-11-0${d + 1}`).length);
+  const weekdays = Array.from({ length: 7 }, (_, d) => dayListFor(store.list('trinity'), `2026-11-0${d + 1}`).length);
   assert.deepEqual([weekdays[0], weekdays[6]], [0, 0]);
   assert.deepEqual(weekdays.slice(1, 6), [4, 3, 2, 3, 2]); // the Bakers stay together on Monday
   store.distributeWeekly('trinity', [1, 2, 3, 4, 5, 6]);
-  assert.equal(itemsDue(store.list('trinity'), '2026-11-01').length, 0);
+  assert.equal(dayListFor(store.list('trinity'), '2026-11-01').length, 0);
   assert.deepEqual(store.list('trinity').spreadDays, [1, 2, 3, 4, 5, 6]);
 });
 
@@ -307,6 +307,7 @@ test('built-in cycle entries can be edited, hidden, and reset', () => {
 test('carry forward: unchecked weekly and monthly entries stay until checked or due again', () => {
   const c = clockAt('2026-11-01T12:00:00Z'); // Sunday
   const store = new Store(memoryStorage(), { clock: c.now });
+  store.updateList('trinity', { everyDay: false }); // only each weekday's names, as a plain weekly list
   const [amy, bob, cy] = store.addItems('trinity', [{ text: 'Amy Adams', day: 1 }, { text: 'Bob Brown', day: 2 }, { text: 'Cy Cole', day: 3 }]);
   const [paul] = store.addItems('diocese', [{ text: 'St Paul', day: 2 }]);
   store.addItems('family', [{ text: 'Mom' }]);
@@ -468,4 +469,50 @@ test('the real diocesan cycles: every church on a day of the month, a name for m
   assert.equal(daily.items.length, 307);
   assert.deepEqual(itemsDue(daily, '2026-11-03').map((i) => [i.text, i.note]), [['Lynn Zobel', 'Deacon, St. Michael’s, Racine']]);
   assert.equal(new Set(daily.items.map((i) => i.id)).size, 307);
+});
+
+// ---------- Morning Prayer lists and your own prayer ----------
+
+test('Trinity is read at Morning Prayer a weekday at a time, and comes up whole every day in your own prayer', () => {
+  const store = new Store(memoryStorage(), { clock: () => Date.parse('2026-11-02T14:00:00Z') });
+  const trinity = store.list('trinity');
+  assert.equal(trinity.morningPrayer, true);
+  assert.equal(trinity.everyDay, true);
+  store.addItems('trinity', [{ text: 'Amy Adams', day: 1, note: 'surgery Friday' }, { text: 'Bob Brown', day: 2 }, { text: 'Cy Cole', day: 1 }]);
+  store.updateList('anglican', { hidden: true });
+
+  // Your own prayer: everyone, every day, Saturday included; nothing carried.
+  for (const date of ['2026-11-02', '2026-11-03', '2026-11-07']) {
+    assert.deepEqual(itemsDue(store.list('trinity'), date).map((i) => i.text), ['Amy Adams', 'Bob Brown', 'Cy Cole']);
+  }
+  assert.equal(carriedOver(store.state, '2026-11-05', () => false).get('trinity'), undefined);
+
+  // Morning Prayer: Monday's names as one list, checked once, apart from the names' own checks.
+  const [office] = officeFor(store.state, '2026-11-02');
+  assert.equal(office.id, 'office:trinity');
+  assert.equal(office.label, 'Monday');
+  assert.deepEqual(office.items.map((i) => i.text), ['Amy Adams', 'Cy Cole']);
+  store.setChecked('2026-11-02', office.id, true);
+  assert.equal(store.isChecked('2026-11-02', office.items[0].id), false); // Amy is still to pray for, privately
+  assert.deepEqual(officeFor(store.state, '2026-11-07'), []); // no names on Saturday's list
+
+  // A list can be read at Morning Prayer or not, and bring only its day's names.
+  store.updateList('trinity', { morningPrayer: false, everyDay: false });
+  assert.deepEqual(officeFor(store.state, '2026-11-02'), []);
+  assert.deepEqual(itemsDue(store.list('trinity'), '2026-11-03').map((i) => i.text), ['Bob Brown']);
+  // Any list can be read at Morning Prayer: the diocese's church for the day, say.
+  store.addItems('diocese', [{ text: 'St Paul’s', day: 2 }]);
+  store.updateList('diocese', { morningPrayer: true });
+  assert.deepEqual(officeFor(store.state, '2026-11-02').map((o) => [o.list.id, o.label, o.items.map((i) => i.text)]), [['diocese', 'Day 2', ['St Paul’s']]]);
+});
+
+test('older copies of Trinity become Morning Prayer lists with everyone every day, unless you chose otherwise', () => {
+  const old = migrate({ schema: 2, lists: [{ id: 'trinity', name: 'Trinity', type: 'weekly', sort: 'last', items: [] }] });
+  assert.equal(old.lists[0].morningPrayer, true);
+  assert.equal(old.lists[0].everyDay, true);
+  const chosen = migrate({ schema: 2, lists: [{ id: 'trinity', name: 'Trinity', type: 'weekly', items: [], morningPrayer: false, everyDay: false }] });
+  assert.equal(chosen.lists[0].morningPrayer, false);
+  assert.equal(chosen.lists[0].everyDay, false);
+  const other = migrate({ schema: 2, lists: [{ id: 'choir', name: 'Choir', type: 'weekly', items: [] }] });
+  assert.equal(other.lists[0].morningPrayer, undefined);
 });
