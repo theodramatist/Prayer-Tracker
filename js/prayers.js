@@ -1,17 +1,24 @@
 // Prayers from the Book of Common Prayer: the Prayers and Thanksgivings
-// (data/prayers.js, built from the Prayer Book's text), and a prayer from the
-// Great Vigil of Easter. Each list opens with one or more of them, which can be
-// changed, reworded, or replaced with your own (Lists → a list → ⋯ → Prayers);
-// any of them can also be prayed one by one in "Prayers and Thanksgivings".
+// (data/prayers.js), the prayers of the Great Vigil of Easter and the Collects
+// and prayers for mission of Morning and Evening Prayer (data/office.js), and
+// the Collect for Proper 28 ("read, mark, learn, and inwardly digest"), each
+// built from the Prayer Book's own pages. Each list opens with one or more of
+// them, which can be changed, reworded, or replaced with your own (Lists → a
+// list → ⋯ → Prayers); any of them can also be prayed one by one in "Prayers
+// and Thanksgivings".
 //
 // The Prayer Book keeps prayers written in traditional idiom as they are, but
 // prints their pronouns and verbs in italics "to assist in rendering them into
 // contemporary speech". Those prayers come in both forms here (Rite One and
 // Rite Two language, chosen in Settings), and so do the few "classical" ones
 // it leaves unmarked, rendered the same way (you and your, and their verbs).
-// Prayers already in contemporary language have just the one form.
+// Prayers already in contemporary language have just the one form. Morning
+// and Evening Prayer's come as the Prayer Book prints them in each rite, and
+// the Great Vigil's in the contemporary language it is printed in.
 
 import bcp from './data/prayers.js';
+import office from './data/office.js';
+import collects from './data/collects.js';
 
 export const SOURCE = 'The Book of Common Prayer';
 
@@ -22,19 +29,19 @@ export const RITES = [
 ];
 export const DEFAULT_RITE = 'contemporary';
 
-// The collect after the reading of Abraham's sacrifice of Isaac (Genesis 22),
-// as printed on page 289.
-const VIGIL = {
-  id: 'vigil',
-  kind: 'prayer',
-  section: 'From the Great Vigil of Easter',
-  title: 'From the Great Vigil of Easter',
-  page: 289,
-  text: 'God and Father of all believers, for the glory of your Name multiply, by the grace of the Paschal sacrament, the number of your children; that your Church may rejoice to see fulfilled your promise to our father Abraham; through Jesus Christ our Lord. Amen.',
-};
+// The Collect for Proper 28, as it is in the Collects (data/collects.js).
+const PROPER_28 = (() => {
+  const c = collects.collects.find((x) => x.id === 'proper-28');
+  return { id: 'proper-28', kind: 'prayer', section: 'From the Collects', title: 'The Collect for Proper 28', pages: c.pages, traditional: c.traditional, contemporary: c.contemporary };
+})();
 
-/** Every prayer by id: "p1"…"p70" and "t1"…"t11" as numbered in the Prayer Book, and "vigil". */
-export const PRAYERS = Object.fromEntries([...bcp.prayers, VIGIL].map((p) => [p.id, p]));
+/**
+ * Every prayer by id: "p1"…"p70" and "t1"…"t11" as numbered in the Prayer
+ * Book; the Great Vigil's ("vigil" is the Collect after Abraham's sacrifice of
+ * Isaac, page 289); Morning and Evening Prayer's ("mp-peace", "ep-mission-2");
+ * and "proper-28".
+ */
+export const PRAYERS = Object.fromEntries([...bcp.prayers, ...office.prayers, PROPER_28].map((p) => [p.id, p]));
 
 /** The names earlier versions of the app gave the prayers it had. */
 const ALIASES = {
@@ -60,6 +67,13 @@ export function prayerText(p, rite = DEFAULT_RITE) {
   if (!p) return '';
   if (p.text != null) return p.text;
   return rite === 'traditional' ? p.traditional : p.contemporary;
+}
+
+/** Its page in the Prayer Book, in the language chosen (Morning and Evening Prayer have one in each rite). */
+export function prayerPage(p, rite = DEFAULT_RITE) {
+  if (!p) return null;
+  if (p.pages) return p.pages[rite === 'traditional' && p.traditional ? 'traditional' : 'contemporary'] || null;
+  return p.page || null;
 }
 
 /** True for a prayer that can be said in both Rite One and Rite Two language. */

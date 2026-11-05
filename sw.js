@@ -2,7 +2,7 @@
 // and served from the cache afterwards. Bump VERSION (and js/version.js) on
 // every release so phones pick up the new files.
 
-const VERSION = '2.9.0';
+const VERSION = '2.10.0';
 const CACHE = `prayer-tracker-${VERSION}`;
 // This copy's own caches, and not the public edition's (prayer-tracker-public-…),
 // which can live at the same web address.
@@ -45,6 +45,7 @@ const ASSETS = [
   './js/version.js',
   './js/data/acp.js',
   './js/data/collects.js',
+  './js/data/office.js',
   './js/data/diocese.js',
   './js/data/prayers.js',
   './fonts/fraunces-latin-ext-full-italic.woff2',

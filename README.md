@@ -115,11 +115,24 @@ You can rename, reorder, hide or delete any of these, and make more lists of any
   thy and thine, with their verbs to match. Prayers already in contemporary language
   have just the one form.
 - **Prayers and Thanksgivings:** any of the Prayer Book's 70 prayers and 11 thanksgivings
-  (pages 810–841) can be prayed one by one each day. **Lists → Prayers and Thanksgivings →
-  Choose prayers** (or Settings → Prayers) opens them under the Prayer Book's headings,
-  folded shut, each showing how many you've chosen; search finds a prayer by its words,
-  and a check adds it. Each comes up on Today and in pray-through to say and check off;
-  tap one to read it in full. You can add your own prayers there too.
+  (pages 810–841) can be prayed one by one each day, and so can these, each under a
+  heading of its own:
+  - **From the Great Vigil of Easter** (pages 285–295): the prayer at the lighting of the
+    Paschal Candle, the Collect after each of the nine Lessons, and the Collects at the
+    Eucharist;
+  - **From Morning Prayer** and **From Evening Prayer**: the Collects after the Suffrages
+    (for Sundays, Fridays and Saturdays, Peace, Grace, Guidance, Protection, and the rest)
+    and the three prayers for mission of each, in Rite One and Rite Two as each rite
+    prints them;
+  - **From the Collects**: the Collect for Proper 28 ("read, mark, learn, and inwardly
+    digest").
+
+  **Lists → Prayers and Thanksgivings → Choose prayers** (or Settings → Prayers) opens
+  them under these headings, folded shut, each showing how many you've chosen; search
+  finds a prayer by its words, and a check adds it. Each comes up on Today and in
+  pray-through to say and check off; tap one to read it in full, with its page. Any of
+  them can also open a list (open the list, tap **⋯**, then Prayers). You can add your
+  own prayers there too.
 - **Colours:** Settings → Colour. *Burgundy* on warm ivory is the default; *Blue* is deep
   blue on linen; *Church year* tints the whole app in the liturgical colour of the day,
   as the ribbon on Today always shows it. Each has a dark version.
@@ -355,7 +368,12 @@ Layout: `index.html`, `css/app.css`, and ES modules in `js/`:
 - `prayers.js` holds the prayers, from `data/prayers.js`: the Prayer Book's Prayers and
   Thanksgivings exactly as printed, built from its PDF by
   `node scripts/build-prayers.mjs path/to/praytnx.pdf`, which also renders the italic
-  pronouns and verbs for Rite Two. `bundles.js` and `data/acp.js` hold the built-in
+  pronouns and verbs for Rite Two; and from `data/office.js`, the Great Vigil's prayers and
+  Morning and Evening Prayer's Collects and prayers for mission, built by
+  `node scripts/build-office.mjs mp1.pdf mp2.pdf ep1.pdf ep2.pdf SpecialDays.pdf --check dir`
+  from the Prayer Book's PDFs (formatted as the original, by Satucket Software) and checked
+  word for word against the Online Book of Common Prayer's pages (`--check`), with the two
+  places those pages differ settled by the complete Prayer Book. `bundles.js` and `data/acp.js` hold the built-in
   Anglican Cycle; `seeds.js` and `data/diocese.js` hold the diocese's cycles,
   which are copied into their lists on first run (`scripts/build-diocese.mjs` builds them).
 - `importer.js` reads pasted text and `pdf.js` reads PDFs; `names.js` handles

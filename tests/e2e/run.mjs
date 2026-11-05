@@ -1003,7 +1003,7 @@ await step('the name requests go under can be changed in Settings', async () => 
 
 await step('Prayer Requests opens with the Vigil prayer, then All Sorts and Conditions', async () => {
   await goToday();
-  assert.deepEqual(await texts('.group[data-list=requests] .prayer-title'), ['FROM THE GREAT VIGIL OF EASTER', 'FOR ALL SORTS AND CONDITIONS OF MEN']);
+  assert.deepEqual(await texts('.group[data-list=requests] .prayer-title'), ['THE GREAT VIGIL: ABRAHAM’S SACRIFICE OF ISAAC', 'FOR ALL SORTS AND CONDITIONS OF MEN']);
   await page.locator('.group[data-list=requests] .prayer summary').first().click();
   assert.match(await page.locator('.group[data-list=requests] .prayer-text').first().innerText(), /^God and Father of all believers, for the glory of your Name multiply/);
   await page.locator('.group[data-list=requests] .prayer summary').first().click();
