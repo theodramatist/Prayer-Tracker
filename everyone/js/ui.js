@@ -56,6 +56,7 @@ const ICONS = {
   trash: '<path d="M4.5 7h15M10 11v6M14 11v6M6.5 7l1 12.5h9l1-12.5M9.5 7V4.5h5V7"/>',
   eye: '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>',
   candle: '<path d="M12 3c1.8 2.1 2.4 3.6 1.6 5-.5.8-1.2 1.2-1.6 1.2s-1.1-.4-1.6-1.2C9.6 6.6 10.2 5.1 12 3z"/><rect x="9" y="11.5" width="6" height="9" rx="1"/>',
+  reach: '<path d="M5 5.5h14A1.5 1.5 0 0 1 20.5 7v8.5A1.5 1.5 0 0 1 19 17h-7.5L7 20.5V17H5a1.5 1.5 0 0 1-1.5-1.5V7A1.5 1.5 0 0 1 5 5.5z"/><path d="M8 10h8M8 13h5"/>',
 };
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -241,6 +242,15 @@ export function plural(n, one, many = `${one}s`) {
  * A prayer's words as paragraphs. A line in *asterisks* is the people's
  * response, or a rubric such as "or this", and is set in italics.
  */
+/**
+ * An entry's details, with each part between " · " (one person, say) kept
+ * together on a line where it fits, so a name isn't split across lines.
+ */
+export function noteParts(note) {
+  const parts = String(note || '').split(' · ');
+  return parts.flatMap((part, k) => [k ? ' · ' : null, h('span', { class: 'note-part' }, part)]).filter(Boolean);
+}
+
 export function prayerBody(text, className = 'prayer-text') {
   return h('div', { class: className },
     String(text || '').split('\n').filter((l) => l.trim()).map((line) => {

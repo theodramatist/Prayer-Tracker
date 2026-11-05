@@ -232,3 +232,52 @@ test('two devices that each copied in the diocese’s cycles agree, with no dupl
   assert.equal(m.lists.find((l) => l.id === 'diocese-daily').items.length, 307);
   assert.ok(Object.keys(m.tombstones).some((id) => id.startsWith('seed-'))); // kept, though older than 180 days
 });
+
+test('someone marked to reach out to goes on the list on every device, and off it when done', async () => {
+  const gh = fakeGitHub();
+  const phone = device(gh);
+  const laptop = device(gh);
+  await phone.sync.connect('me/prayer-data', 'good');
+  await laptop.sync.connect('me/prayer-data', 'good');
+  const [ann, bob] = phone.store.addItems('clergy', [{ text: 'Fr. Ann Example' }, { text: 'Fr. Bob Example' }]);
+  phone.store.setReach(bob.id, '2026-11-05');
+  phone.store.setReach(ann.id, '2026-11-03');
+  await phone.sync.sync();
+  await laptop.sync.sync();
+  // Longest waiting first.
+  assert.deepEqual(laptop.store.reachOut().map(({ list, item }) => [list.id, item.text, item.reach]), [
+    ['clergy', 'Fr. Ann Example', '2026-11-03'], ['clergy', 'Fr. Bob Example', '2026-11-05'],
+  ]);
+  laptop.store.setReach(ann.id, null);
+  await laptop.sync.sync();
+  await phone.sync.sync();
+  assert.deepEqual(phone.store.reachOut().map(({ item }) => item.text), ['Fr. Bob Example']);
+  // An edit that leaves it alone keeps it; moving the entry takes the mark with it.
+  phone.store.updateItem(bob.id, { note: 'Rector, St. Example’s' });
+  assert.equal(phone.store.findItem(bob.id).item.reach, '2026-11-05');
+  phone.store.moveItem(bob.id, 'family');
+  assert.deepEqual(phone.store.reachOut().map(({ list, item }) => [list.id, item.reach]), [['family', '2026-11-05']]);
+});
+
+test('a change made just after syncing wins, even when another device’s clock runs fast', async () => {
+  const gh = fakeGitHub();
+  const make = (clock) => {
+    const storage = memoryStorage();
+    const store = new Store(storage, { clock });
+    return { store, sync: new SyncManager(store, { fetchImpl: gh.fetch, storage }) };
+  };
+  const real = Date.parse('2026-11-05T15:00:00Z');
+  const fast = make(() => real + 10 * 60 * 1000); // ten minutes ahead
+  const slow = make(() => real);
+  await fast.sync.connect('me/prayer-data', 'good');
+  const [ann] = fast.store.addItems('clergy', [{ text: 'Fr. Ann Example' }]);
+  fast.store.setReach(ann.id, '2026-11-05');
+  await fast.sync.sync();
+  await slow.sync.connect('me/prayer-data', 'good');
+  // Marked done on the device whose clock is behind, a moment later.
+  slow.store.setReach(ann.id, null);
+  await slow.sync.sync();
+  await fast.sync.sync();
+  assert.deepEqual(fast.store.reachOut(), []);
+  assert.deepEqual(slow.store.reachOut(), []);
+});

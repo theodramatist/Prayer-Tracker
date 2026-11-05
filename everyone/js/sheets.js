@@ -8,6 +8,7 @@ import { bundleFor } from './bundles.js';
 import { seedFor } from './seeds.js';
 import { canShare, shareFields, queueShares, cancelShares, sharingNote, sendSharesSoon, sharedNote, shareButton } from './share-ui.js';
 import { EDITION } from './edition.js';
+import { canReach } from './reach.js';
 import { parseList, parseWeekly, parseMonthly, parseDated } from './importer.js';
 import { parseName, compareNames } from './names.js';
 import { WEEKDAYS, WEEKDAYS_SHORT, addDays, diffDays, formatShort, formatMedium, formatWithYear, weekday, parseKey, isValidKey, todayKey } from './dates.js';
@@ -378,6 +379,7 @@ export function openItemSheet(app, itemId, { list: inList = null, entry = null }
 
   const text = h('input', { class: 'input input-lg', value: item.text, 'aria-label': 'Name or prayer request', enterkeyhint: 'done' });
   const note = h('textarea', { class: 'input', rows: 2, placeholder: 'Details (optional)', 'aria-label': 'Details', value: item.note || '' });
+  autoGrow(note, 220);
   const schedule = h('div', { class: 'schedule' });
 
   const endPresets = [
@@ -439,6 +441,13 @@ export function openItemSheet(app, itemId, { list: inList = null, entry = null }
   const shared = sharedNote(item);
   if (shared) details.push(shared);
   const shareBtn = canShare(list) && shareButton(app, item, () => sheet.close());
+  let reach = item.reach || null;
+  const reachToggle = canReach(store, item) && toggle({
+    label: 'Reach out to them',
+    hint: reach ? `On your Reach out list since ${formatMedium(reach)}. It’s at the end of Today until you mark it done.` : 'Puts them on your Reach out list, at the end of Today and of pray-through.',
+    checked: !!reach,
+    onChange: (v) => { reach = v ? (item.reach || app.today) : null; },
+  });
 
   const save = h('button', { class: 'btn btn-primary', type: 'submit' }, 'Save');
   const del = h('button', { class: 'btn btn-danger', type: 'button' }, icon('trash'), 'Delete');
@@ -448,6 +457,7 @@ export function openItemSheet(app, itemId, { list: inList = null, entry = null }
     field('Details', note),
     field('List', listSelect),
     schedule,
+    reachToggle,
     details.length && h('p', { class: 'hint' }, details.join(' · ')),
     shareBtn,
     h('div', { class: 'sheet-actions sheet-actions-split' }, del, save));
@@ -457,7 +467,7 @@ export function openItemSheet(app, itemId, { list: inList = null, entry = null }
     e.preventDefault();
     const value = text.value.trim();
     if (!value) { text.focus(); return; }
-    const fields = { text: value, note: note.value.trim() || null, end: target.type === 'dated' ? null : end };
+    const fields = { text: value, note: note.value.trim() || null, end: target.type === 'dated' ? null : end, reach };
     if (target.type === 'weekly' || target.type === 'monthly') fields.day = day;
     if (target.type === 'dated') fields.date = date;
     if (target.id !== list.id) {
@@ -488,6 +498,7 @@ function openEntrySheet(app, list, entry) {
   const builtin = !!entry.builtin;
   const text = h('input', { class: 'input input-lg', value: entry.text, 'aria-label': 'Entry', enterkeyhint: 'done' });
   const note = h('textarea', { class: 'input', rows: 3, placeholder: 'Details (optional)', 'aria-label': 'Details', value: entry.note || '' });
+  autoGrow(note, 220);
   const save = h('button', { class: 'btn btn-primary', type: 'submit' }, 'Save');
   const remove = h('button', { class: 'btn btn-danger', type: 'button' }, icon('trash'), builtin ? 'Hide' : 'Delete');
   const restore = builtin && entry.edited ? h('button', { class: 'link-btn', type: 'button' }, 'Restore the original wording') : null;
@@ -1063,7 +1074,7 @@ export function openPrayerPicker(app, listId = null) {
   const done = h('button', { class: 'btn btn-primary btn-block', type: 'button', onclick: () => sheet.close() }, 'Done');
   const content = h('div', { class: 'picker' },
     h('p', { class: 'sheet-text' }, `From the Prayer Book’s Prayers and Thanksgivings, in ${RITES.find((r) => r.value === rite)?.label || 'Rite Two'} language where it has both (change it in Settings).`),
-    search,
+    h('div', { class: 'search-wrap' }, icon('search'), search),
     counter,
     body,
     ownBox,

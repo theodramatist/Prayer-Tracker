@@ -1150,6 +1150,49 @@ await step('Lesser Feasts and Fasts: your own copy of the PDF is read on the dev
   assert.equal(await page.locator('.feast').innerText(), 'The Season after Pentecost');
 });
 
+await step('Reach out to: someone marked while praying for them is served up after praying through, and on Today until done', async () => {
+  await page.evaluate(() => window.prayerTracker.store.addItems('family', [{ text: 'Uncle Example', note: 'Moving house this week' }]));
+  await page.locator('.btn-pray').click();
+  const pray = page.locator('dialog.pray');
+  await pray.waitFor();
+  for (let k = 0; k < 30 && (await pray.locator('.pray-name').innerText().catch(() => '')) !== 'Uncle Example'; k++) {
+    await pray.locator('button', { hasText: 'Skip' }).or(pray.locator('.btn-amen')).first().click();
+  }
+  assert.equal(await pray.locator('.pray-name').innerText(), 'Uncle Example');
+  const reach = pray.locator('.btn-reach');
+  assert.equal(await reach.getAttribute('aria-pressed'), 'false');
+  await reach.click();
+  await eventually(async () => assert.equal(await pray.locator('.btn-reach').getAttribute('aria-pressed'), 'true'));
+  assert.match(await pray.locator('.btn-reach').innerText(), /Will reach out/);
+  await sleep(450);
+  await shot('38-pray-reach');
+  for (let k = 0; k < 30 && !(await pray.locator('.pray-end').count()); k++) await pray.locator('.btn-amen').click();
+  assert.deepEqual((await pray.locator('.pray-reach-name').allInnerTexts()).map((t) => t.trim()), ['Uncle Example']);
+  assert.match(await pray.locator('.pray-reach').innerText(), /at the end of Today until you mark them done/);
+  await sleep(450);
+  await shot('39-pray-end-reach');
+  await pray.locator('.btn-amen').click(); // Close
+  await pray.waitFor({ state: 'detached' });
+  // On Today, at the end: the person, their list, and Done.
+  const section = page.locator('section.reach');
+  await section.waitFor();
+  assert.deepEqual(await texts('section.reach .item-text'), ['Uncle Example']);
+  assert.match(await section.locator('.reach-from').innerText(), /^Family · today$/);
+  await section.locator('.reach-done').click();
+  await eventually(async () => assert.equal(await page.locator('section.reach').count(), 0));
+  await page.locator('.toast.show .toast-action').click(); // Undo
+  await eventually(async () => assert.deepEqual(await texts('section.reach .item-text'), ['Uncle Example']));
+  // The entry's sheet can take them off too.
+  await section.locator('.item-body').click();
+  const sheet = page.locator('.sheet-item');
+  await sheet.waitFor();
+  assert.match(await sheet.locator('.toggle-row', { hasText: 'Reach out to them' }).innerText(), /On your Reach out list since/);
+  await sheet.locator('.toggle-row', { hasText: 'Reach out to them' }).locator('.toggle-text').click();
+  await sheet.locator('button[type=submit]').click();
+  await sheet.waitFor({ state: 'detached' });
+  await eventually(async () => assert.equal(await page.locator('section.reach').count(), 0));
+});
+
 await step('colours: burgundy on ivory unless blue or the church year is chosen', async () => {
   const root = (k) => page.evaluate((key) => document.documentElement.dataset[key], k);
   const accent = () => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--accent').trim());
@@ -1276,13 +1319,14 @@ await step('public: a prayer request has no Share with Trinity', async () => {
   assert.deepEqual(await texts('.group[data-list=requests] .item-text'), ['Pat – surgery Friday']);
 });
 
-await step('public: Settings has no sync, Trinity or Lesser Feasts and Fasts, and says the list stays on the phone', async () => {
+await step('public: Settings has Lesser Feasts and Fasts (from your own copy) but no sync or Trinity, and says the list stays on the phone', async () => {
   await page.click('.tabbar a[href="#/lists"]');
   await page.click('a[href="#/settings"]');
   await page.locator('.settings-card h2').first().waitFor();
   const titles = (await texts('.settings-card h2')).map((t) => t.toLowerCase());
-  for (const gone of ['Lesser Feasts and Fasts', 'Sharing with Trinity', 'Sync across devices']) assert.ok(!titles.includes(gone.toLowerCase()), gone);
-  for (const kept of ['Appearance', 'Prayers', 'Backup', 'Home Screen', 'About']) assert.ok(titles.includes(kept.toLowerCase()), `${kept}: ${titles}`);
+  for (const gone of ['Sharing with Trinity', 'Sync across devices']) assert.ok(!titles.includes(gone.toLowerCase()), gone);
+  for (const kept of ['Appearance', 'Prayers', 'Lesser Feasts and Fasts', 'Backup', 'Home Screen', 'About']) assert.ok(titles.includes(kept.toLowerCase()), `${kept}: ${titles}`);
+  assert.match(await page.locator('.settings-card', { hasText: 'Lesser Feasts and Fasts' }).innerText(), /stay on this device, and in your backups/);
   assert.match(await page.locator('.settings-card', { hasText: 'About' }).innerText(), /Nothing you enter leaves this device: there are no accounts and no tracking\./);
   assert.match(await page.locator('.settings-card', { hasText: 'About' }).innerText(), /Book of Common Prayer \(1979\), which is in the public domain/);
   // A list's settings: no Morning Prayer, and "everyone every day" for your church.

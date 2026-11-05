@@ -105,6 +105,22 @@ export function migrate(data, now = Date.now(), today = todayKey()) {
   };
 }
 
+/** The latest time stamped anywhere in a document. */
+export function latestStamp(state) {
+  let t = Number(state.orderUpdated) || 0;
+  const see = (x) => { const n = Math.abs(Number(x) || 0); if (n > t) t = n; };
+  for (const l of state.lists || []) {
+    see(l.updated);
+    for (const i of l.items || []) see(i.updated);
+    for (const o of Object.values(l.overrides || {})) see(o?.updated);
+  }
+  for (const v of Object.values(state.tombstones || {})) see(v);
+  for (const day of Object.values(state.checks || {})) for (const v of Object.values(day)) see(v);
+  see(state.settings?.updated);
+  for (const b of Object.values(state.library || {})) see(b?.updated);
+  return t;
+}
+
 /** The part of the state that is shared between devices. */
 export function syncDocument(state) {
   const { schema, lists, checks, tombstones, settings, library = {}, orderUpdated } = state;
@@ -257,6 +273,9 @@ export class Store {
       Object.assign(s, migrate({ ...doc, meta }, this.clock()));
       for (const l of s.lists) l.items.sort((a, b) => (a.created || 0) - (b.created || 0) || (a.id < b.id ? -1 : 1));
     });
+    // Whatever is changed here next must count as newer than anything just
+    // seen from the other devices, even if one of their clocks runs ahead.
+    this.lastStamp = Math.max(this.lastStamp, latestStamp(this.state));
   }
 
   syncDocument() {
@@ -316,6 +335,10 @@ export class Store {
     if (list.type === 'cycle') item.seq = Number.isInteger(entry.seq) && entry.seq >= 0 ? entry.seq : 0;
     if (entry.start) item.start = entry.start;
     if (entry.end) item.end = entry.end;
+    // What the entry carries with it, moved to another list: when it was
+    // shared, and whether you're to reach out to them.
+    if (entry.shared && typeof entry.shared === 'object') item.shared = { ...entry.shared };
+    if (isValidKey(entry.reach)) item.reach = entry.reach;
     return item;
   }
 
@@ -375,7 +398,7 @@ export class Store {
           item.last = shaped.last;
         }
       }
-      for (const key of ['note', 'day', 'date', 'start', 'end']) {
+      for (const key of ['note', 'day', 'date', 'start', 'end', 'reach']) {
         if (!(key in patch)) continue;
         const before = item[key];
         if (patch[key] == null || patch[key] === '') delete item[key];
@@ -386,6 +409,28 @@ export class Store {
       item.updated = this.stamp();
       return item;
     });
+  }
+
+  /**
+   * Put someone on your "Reach out to" list (as of a date), or take them off
+   * it (null). It's kept on the entry, so it syncs, and moves, with it.
+   */
+  setReach(itemId, dateKey, opts) {
+    return this.commit(() => {
+      const found = this.findItem(itemId);
+      if (!found) return null;
+      if (dateKey) found.item.reach = dateKey;
+      else delete found.item.reach;
+      found.item.updated = this.stamp();
+      return found.item;
+    }, opts);
+  }
+
+  /** Everyone to reach out to, longest waiting first: [{ list, item }]. */
+  reachOut() {
+    const out = [];
+    for (const list of this.state.lists) for (const item of list.items) if (item.reach) out.push({ list, item });
+    return out.sort((a, b) => (a.item.reach < b.item.reach ? -1 : a.item.reach > b.item.reach ? 1 : a.item.text.localeCompare(b.item.text)));
   }
 
   /** Note that an entry was shared somewhere (say, a parish's prayer list) on a date. */

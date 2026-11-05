@@ -2,12 +2,13 @@
 // It opens with the Collect of the Day, and each list with its prayers;
 // "Amen" marks an entry prayed and moves on.
 
-import { h, icon, replace, prayerBody } from './ui.js';
+import { h, icon, replace, prayerBody, noteParts } from './ui.js';
 import { dayModel, pendingEntries } from './today.js';
 import { prayersFor, itemPrayer, isPrayerItem, DEFAULT_RITE } from './prayers.js';
 import { formatMedium } from './dates.js';
 import { collectFor, collectSource } from './collects.js';
 import { keptFeasts, feastCollect, feastSource } from './lff.js';
+import { canReach, toggleReach, reachButton, reachSummary } from './reach.js';
 
 export function openPrayThrough(app) {
   const { store } = app;
@@ -66,12 +67,16 @@ export function openPrayThrough(app) {
         prayerBody(card.prayer.text, 'pray-prayer-text'),
         card.prayed && h('p', { class: 'pray-done' }, icon('check'), 'Prayed'));
     } else if (card.kind === 'entry') {
+      const reach = canReach(store, card.item) && store.findItem(card.item.id)?.item.reach;
       body = h('div', { class: `pray-card pray-entry ${card.prayed ? 'is-prayed' : ''}` },
         h('p', { class: 'pray-eyebrow' }, eyebrow(card.group)),
         h('h2', { class: `pray-name ${card.item.text.length > 40 ? 'long' : ''}` }, card.item.text),
-        card.item.note && h('p', { class: 'pray-note' }, card.item.note),
+        card.item.note && h('p', { class: 'pray-note' }, noteParts(card.item.note)),
         card.carried && h('p', { class: 'pray-from' }, `From ${formatMedium(card.date)}`),
-        card.prayed && h('p', { class: 'pray-done' }, icon('check'), 'Prayed'));
+        card.prayed && h('p', { class: 'pray-done' }, icon('check'), 'Prayed'),
+        // Reminded, while praying for them, to get in touch?
+        canReach(store, card.item) && h('div', { class: 'pray-reach-toggle' },
+          reachButton(!!reach, () => { toggleReach(app, card.item, { silent: true }); render(); }, card.item.text)));
     } else {
       const prayed = entryCards.filter((c) => c.prayed).length;
       body = h('div', { class: 'pray-card pray-end' },
@@ -79,7 +84,8 @@ export function openPrayThrough(app) {
         h('p', { class: 'pray-response' }, 'Thanks be to God.'),
         h('p', { class: 'pray-summary' }, prayed === entryCards.length
           ? 'Everyone on today’s list has been prayed for.'
-          : `${prayed} of ${entryCards.length} prayed for. The rest are still on Today.`));
+          : `${prayed} of ${entryCards.length} prayed for. The rest are still on Today.`),
+        reachSummary(app));
     }
     replace(stage, body);
     body.classList.add('enter');
@@ -121,9 +127,12 @@ export function openPrayThrough(app) {
 
   function close() {
     dlg.classList.add('closing');
+    app.onReachUndo = null;
     setTimeout(() => { if (dlg.open) dlg.close(); dlg.remove(); app.render(); }, 160);
   }
 
+  // Undo on a "Reach out" message redraws the card.
+  app.onReachUndo = () => render();
   dlg.addEventListener('cancel', (e) => { e.preventDefault(); close(); });
   dlg.addEventListener('keydown', (e) => {
     if (e.key === 'ArrowRight') { e.preventDefault(); go(1); }

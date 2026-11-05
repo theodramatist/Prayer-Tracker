@@ -100,7 +100,7 @@ export function renderSettings(app) {
   if (!standalone) {
     installSteps.push(
       h('p', { class: ios ? 'install-here' : '' }, h('strong', null, 'iPhone or iPad: '), 'open this page in Safari, tap Share, then Add to Home Screen.'),
-      h('p', { class: android ? 'install-here' : '' }, h('strong', null, 'Android: '), 'in Chrome, tap ⋮ then Install app (or Add to Home screen).'),
+      h('p', { class: android ? 'install-here' : '' }, h('strong', null, 'Android: '), 'in Chrome, tap ⋮ then Install app (or Add to Home screen).'),
     );
   }
   installSteps.push(h('p', { class: 'hint' }, 'On Android, long-press the app icon for a quick “Add a prayer request”, and use Share in any app (Messages, email) to send text straight to a new request.'));
@@ -144,7 +144,7 @@ export function renderSettings(app) {
       }),
       toggle({
         label: 'Show each list’s prayers',
-        hint: 'Prayers from the Prayer Book open each list on Today and in pray-through. To change them, open the list and tap ⋯.',
+        hint: 'Prayers from the Prayer Book open each list on Today and in pray-through. To change them, open the list and tap ⋯.',
         checked: s.showPrayers !== false,
         onChange: (v) => store.setSetting('showPrayers', v),
       }),

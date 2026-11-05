@@ -1,7 +1,7 @@
 // The Lists screen and each list's own page, where entries are added,
 // pasted in, edited and (for weekly lists) spread over the week.
 
-import { h, icon, toast, plural } from './ui.js';
+import { h, icon, toast, plural, noteParts } from './ui.js';
 import { LIST_TYPES, SORTS, sortItems, partitionByStatus, endLabel, datedRange, cycleSource, itemsDue, builtinEntries } from './schedule.js';
 import { WEEKDAYS, MONTHS, addDays, formatMedium, formatWithYear, formatShort, parseKey } from './dates.js';
 import { editionById } from './bundles.js';
@@ -84,7 +84,7 @@ function row(app, item, { key, today, list = null, badge: extra = null } = {}) {
       key && h('span', { class: 'row-key' }, key),
       h('span', { class: 'row-main' },
         h('span', { class: 'row-text' }, item.text),
-        note && h('span', { class: 'row-note' }, note)),
+        note && h('span', { class: 'row-note' }, noteParts(note))),
       badge && h('span', { class: `badge ${badge === 'Last day' ? 'badge-warn' : ''}` }, badge)));
 }
 

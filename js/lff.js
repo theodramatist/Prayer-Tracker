@@ -3,8 +3,9 @@
 //
 // The book is under copyright, so its text isn't part of the app: you load
 // your own copy of the PDF (the Episcopal Church publishes it free) and the
-// app reads it on your device, keeps what it needs here, and copies it to
-// your other devices only through your own private sync repository.
+// app reads it on your device and keeps what it needs there (in the full
+// edition, copying it to your other devices only through your own private
+// sync repository).
 //
 // The lesser feasts are days of optional observance, kept "subject to the
 // rules of precedence governing Principal Feasts, Sundays, and Holy Days" (the
@@ -16,12 +17,13 @@
 // simply not kept.
 
 import { observance } from './calendar.js';
+import { EDITION } from './edition.js';
 
 export const LFF_AVAILABLE = true;
 
 /** The Episcopal Church's own PDF of the current edition. */
 export const LFF_URL = 'https://www.episcopalchurch.org/wp-content/uploads/2025/03/lesser_feasts_and_fasts_-_2024__final_.pdf';
-export const LFF_KEY = 'prayer-tracker:lff';
+export const LFF_KEY = `${EDITION.storage}:lff`;
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const MONTH = new RegExp(`(${MONTHS.join('|')})(?: (\\d{1,2}))?`);

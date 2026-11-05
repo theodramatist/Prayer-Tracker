@@ -664,6 +664,8 @@ code { font: 0.92em/1 ui-monospace, "SF Mono", Menlo, monospace; padding: 1px 5p
 
 /* Prayers: paragraphs, and the people's responses and rubrics in italics. */
 .prayer + .prayer { margin-top: -4px; }
+.prayer[open] { margin-bottom: 18px; }
+.prayer[open] + .prayer { margin-top: 0; }
 .prayer-text p + p, .pray-prayer-text p + p { margin-top: .55em; }
 .prayer-response { color: var(--text-2); }
 .prayer-read { font-size: 17.5px; }
@@ -684,7 +686,7 @@ code { font: 0.92em/1 ui-monospace, "SF Mono", Menlo, monospace; padding: 1px 5p
   background: var(--surface);
 }
 .prayer-row-head { display: flex; align-items: center; gap: 8px; }
-.prayer-row-title { flex: 1; min-width: 0; font-family: var(--font-serif); font-size: 16.5px; }
+.prayer-row-title { flex: 1; min-width: 0; font-family: var(--font-serif); font-size: 16.5px; text-wrap: balance; }
 .prayer-row-tools { display: flex; gap: 2px; }
 .prayer-row-tools .icon-btn { width: 36px; height: 36px; }
 .prayer-row .link-btn { font-size: 14px; }
@@ -1161,14 +1163,19 @@ input[type="date"].input { -webkit-appearance: none; appearance: none; min-width
 .pray-count { text-align: center; color: var(--text-3); font-size: 13.5px; font-variant-numeric: tabular-nums; }
 .pray-stage {
   flex: 1;
+  min-height: 0;
   display: flex;
-  align-items: center;
-  justify-content: center;
   padding: 12px 28px;
   overflow-y: auto;
+  overscroll-behavior: contain;
   touch-action: pan-y;
+  /* A soft edge above the buttons: a long prayer reads on below it. */
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 18px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 18px), transparent);
 }
-.pray-card { width: 100%; max-width: 560px; text-align: center; }
+/* Centred while it fits; from the top, and scrollable, when it doesn't
+   (auto margins give way where align-items: center would cut it off). */
+.pray-card { width: 100%; max-width: 560px; margin: auto; padding: 8px 0 12px; text-align: center; }
 .pray-card.enter { animation: card-in .32s ease; }
 @keyframes card-in { from { opacity: 0; transform: translateY(10px); } }
 .pray-eyebrow { color: var(--accent); margin-bottom: 18px; }
@@ -1194,7 +1201,7 @@ input[type="date"].input { -webkit-appearance: none; appearance: none; min-width
 .pray-from { margin-top: 14px; color: var(--text-3); font-size: 14px; }
 .pray-done { margin-top: 18px; display: inline-flex; align-items: center; gap: 6px; color: var(--accent); font-weight: 650; }
 .pray-done .icon { width: 18px; height: 18px; stroke-width: 2.6; }
-.pray-prayer-title { font-size: 26px; font-style: italic; font-weight: 460; font-variation-settings: "SOFT" 80; margin-bottom: 14px; }
+.pray-prayer-title { font-size: 26px; font-style: italic; font-weight: 460; font-variation-settings: "SOFT" 80; margin-bottom: 14px; text-wrap: balance; }
 .pray-prayer-text {
   font-family: var(--font-serif);
   font-size: 19px;
@@ -1212,7 +1219,7 @@ input[type="date"].input { -webkit-appearance: none; appearance: none; min-width
   font-variation-settings: "SOFT" 100, "WONK" 1;
   color: var(--accent);
 }
-.pray-summary { margin-top: 12px; color: var(--text-2); }
+.pray-summary { margin-top: 12px; color: var(--text-2); text-wrap: balance; }
 .pray-actions {
   display: flex;
   align-items: center;
@@ -1236,3 +1243,38 @@ input[type="date"].input { -webkit-appearance: none; appearance: none; min-width
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+
+/* Line breaks: headings in lines of even length, and no word (or "⋯") left
+   alone on the last line of a hint or a paragraph. */
+h1, h2, h3, .feast, .complete-title, .pray-name, .picker-heading, .prayer-title, .toggle-label, .sheet-title { text-wrap: balance; }
+p, .hint, .toggle-text .hint, .sheet-text, .item-note, .row-note, .pray-note, .collect-source, .pray-source, li { text-wrap: pretty; }
+/* A person in an entry's details ("Pippa Lindwright, Rector") stays on one line where it fits. */
+.note-part { display: inline-block; }
+
+/* ---------- Reach out to: people to get in touch with ---------- */
+
+.reach { margin-top: 30px; }
+.reach-head { display: flex; align-items: baseline; gap: 9px; padding: 0 4px 9px; }
+.reach-head h2 { font-size: 22px; line-height: 1.2; min-width: 0; }
+.reach-item .item-body { padding-left: 16px; }
+.reach-item + .reach-item::before { left: 16px; }
+.reach-from { margin-top: 2px; color: var(--text-3); font-size: 13px; }
+.reach-done { flex: none; align-self: center; margin-right: 12px; }
+.reach-done .icon { width: 16px; height: 16px; }
+
+/* In pray-through: the button on a person's card, and the list at the end. */
+.pray-reach-toggle { margin-top: 26px; }
+.btn-reach { gap: 7px; }
+.btn-reach .icon { width: 17px; height: 17px; }
+.btn-reach.on { background: var(--accent-soft); border-color: transparent; color: var(--accent); }
+.pray-reach { margin: 30px auto 0; max-width: 360px; text-align: left; }
+.pray-reach .pray-eyebrow { text-align: center; margin-bottom: 10px; }
+.pray-reach-list {
+  list-style: none; margin: 0; padding: 0;
+  border-radius: var(--radius); background: var(--surface); border: 1px solid var(--line);
+}
+.pray-reach-list li { display: flex; align-items: baseline; gap: 10px; padding: 11px 14px; }
+.pray-reach-list li + li { border-top: 1px solid var(--line); }
+.pray-reach-name { flex: 1; min-width: 0; font-size: 17px; font-weight: 500; overflow-wrap: anywhere; }
+.pray-reach-from { color: var(--text-3); font-size: 13px; white-space: nowrap; }
+.pray-reach .pray-summary { text-align: center; font-size: 14.5px; }

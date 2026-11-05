@@ -42,13 +42,13 @@ test('the committed everyone/ is up to date (run node scripts/build-public.mjs)'
 test('nothing of the full edition’s own is in it', async () => {
   for (const gone of ['js/data/diocese.js', 'js/share.js']) assert.ok(!files.includes(gone), gone);
   const personal = [/Chris Corbin/, /Corbin/, /docs\.google\.com\/forms/, /Trinity Prayer Requests/, /Share with Trinity/, /Trinity’s/,
-    /api\.github\.com/, /GitHubFile/, /prayer-data/, /episcopalchurch\.org/, /lesser_feasts/, /Wisconsin/, /trinityosh/, /frchris/i];
+    /api\.github\.com/, /GitHubFile/, /prayer-data/, /Wisconsin/, /trinityosh/, /frchris/i];
   for (const f of files.filter((x) => !x.startsWith('vendor/') && /\.(js|html|css|webmanifest)$/.test(x))) {
     const text = await read(f);
     for (const re of personal) assert.ok(!re.test(text), `${f} has ${re}`);
   }
   // The stand-ins, in place of the full edition's modules.
-  for (const m of ['edition', 'share-ui', 'extras', 'sync', 'lff', 'seeds']) {
+  for (const m of ['edition', 'share-ui', 'extras', 'sync', 'seeds']) {
     assert.equal(await read(`js/${m}.js`), await readFile(join(ROOT, 'edition/public', `${m}.js`), 'utf8'), m);
   }
 });
@@ -85,4 +85,15 @@ test('its manifest and instructions page', async () => {
   assert.match(install, /Add to Home Screen/);
   assert.match(install, /Install app/);
   assert.match(install, /stays on your phone/);
+  assert.match(install, /Lesser Feasts and Fasts/);
+});
+
+test('Lesser Feasts and Fasts can be loaded from your own copy, and is kept on the phone under the edition’s own key', async () => {
+  const lff = await read('js/lff.js');
+  assert.equal(lff, await readFile(join(ROOT, 'js/lff.js'), 'utf8')); // the same reader as the full edition
+  const { LFF_KEY, LFF_AVAILABLE } = await import(pathToFileURL(join(built, 'js/lff.js')).href);
+  assert.equal(LFF_AVAILABLE, true);
+  assert.equal(LFF_KEY, 'prayer-tracker-public:lff');
+  assert.match(await read('js/extras.js'), /lffCard/);
+  assert.doesNotMatch(await read('js/extras.js'), /shareCard|syncCard/);
 });

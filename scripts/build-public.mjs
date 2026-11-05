@@ -1,10 +1,11 @@
 // Builds the public edition into everyone/: Prayer Tracker for anyone, with
 // the Anglican Cycle of Prayer, their own church, their own lists, the
 // Collect of the Day and the Prayer Book's prayers, kept on their own device.
-// It leaves out sync, Share with Trinity, the Diocese of Wisconsin's cycles,
-// Morning Prayer lists and Lesser Feasts and Fasts: their modules are
-// replaced by the stand-ins in edition/public/, so none of their code or data
-// is published there.
+// It leaves out sync, Share with Trinity, the Diocese of Wisconsin's cycles
+// and Morning Prayer lists: their modules are replaced by the stand-ins in
+// edition/public/, so none of their code or data is published there. Lesser
+// Feasts and Fasts comes in as in the full edition: each person loads their
+// own copy of the PDF, which stays on their phone.
 //
 //   node scripts/build-public.mjs [--out everyone]
 //
@@ -26,7 +27,7 @@ const STUBS = join(ROOT, 'edition', 'public');
 const COPY = ['index.html', 'css', 'fonts', 'icons', 'js', 'vendor'];
 // Only the full edition's own modules use these.
 const LEAVE_OUT = ['js/data/diocese.js', 'js/share.js'];
-const REPLACE = ['js/edition.js', 'js/share-ui.js', 'js/extras.js', 'js/sync.js', 'js/lff.js', 'js/seeds.js'];
+const REPLACE = ['js/edition.js', 'js/share-ui.js', 'js/extras.js', 'js/sync.js', 'js/seeds.js'];
 const DESCRIPTION = 'Daily intercessions: the Anglican Cycle of Prayer, your church, and your own prayer list, with the Collect of the Day.';
 
 /** Replace exactly one occurrence, or stop: the build must notice when the app changes under it. */

@@ -72,7 +72,7 @@ export const renderedByApp = (p) => p?.rendered === 'app';
 export function firstWords(text, n = 12) {
   const first = String(text || '').split('\n')[0].replace(/\*/g, '');
   const words = first.split(/\s+/);
-  return words.length > n ? `${words.slice(0, n).join(' ')}…` : first;
+  return words.length > n ? `${words.slice(0, n).join(' ').replace(/[,;:]$/, '')}…` : first;
 }
 
 /** Which prayers each of the starting lists opens with. */

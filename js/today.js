@@ -4,13 +4,14 @@
 // then the lists read at Morning Prayer, each as one list marked once, apart
 // from your own prayer below.
 
-import { h, icon, toast, plural, prayerBody } from './ui.js';
+import { h, icon, toast, plural, prayerBody, noteParts } from './ui.js';
 import { agenda, carriedOver, endLabel, entryCount, officeFor } from './schedule.js';
 import { formatDate, formatLong, formatMedium, formatWithYear, diffDays } from './dates.js';
 import { dayTitle } from './calendar.js';
 import { prayersFor, itemPrayer, isPrayerItem, firstWords, DEFAULT_RITE } from './prayers.js';
 import { collectChoices, collectSource } from './collects.js';
 import { keptFeasts, feastCollect, feastSource } from './lff.js';
+import { reachSection } from './reach.js';
 import { openAddSheet, openItemSheet, openImportSheet, openPrayerPicker, loadSeed, ACP_URL } from './sheets.js';
 import { seedFor } from './seeds.js';
 import { openPrayThrough } from './praythrough.js';
@@ -127,6 +128,8 @@ export function renderToday(app) {
         'aria-pressed': String(app.showDone),
         onclick: () => { app.showDone = !app.showDone; app.render(); },
       }, icon('eye'), app.showDone ? 'Hide prayed' : `Show prayed (${done})`)),
+    // People you marked while praying, to get in touch with.
+    date === app.today && app.filter === 'all' && reachSection(app, (id) => openItemSheet(app, id)),
   ];
 }
 
@@ -357,7 +360,7 @@ function itemRow(app, list, item, isDone, { date = app.viewDate, from = null } =
     onclick: () => openItemSheet(app, item.id, { list, entry: item.builtin ? item : null }),
   },
   h('span', { class: 'item-text' }, item.text),
-  prayer ? h('span', { class: 'item-note item-prayer' }, firstWords(prayer.text, 14)) : item.note && h('span', { class: 'item-note' }, item.note),
+  prayer ? h('span', { class: 'item-note item-prayer' }, firstWords(prayer.text, 14)) : item.note && h('span', { class: 'item-note' }, noteParts(item.note)),
   badge && h('span', { class: `badge ${badge === 'Last day' ? 'badge-warn' : ''} ${from ? 'badge-from' : ''}` }, badge));
   li.append(check, body);
 

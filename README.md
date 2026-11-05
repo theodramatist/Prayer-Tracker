@@ -78,6 +78,11 @@ You can rename, reorder, hide or delete any of these, and make more lists of any
 - **Pray through the list** opens a quiet full-screen view: the Collect of the Day, then
   each list's prayer and one entry at a time in large type. **Amen** marks it prayed and moves on; **Skip** and
   **Back** (or swipe) move without marking.
+- **Reach out to:** in pray-through, tap **Reach out** on someone's card when you're
+  reminded to get in touch with them (or turn on **Reach out to them** in their entry).
+  They come up at the end of pray-through, and in **Reach out to** at the end of Today,
+  with the list they're on, until you tap **Done** (Undo puts them back). The mark stays
+  with the entry, so it syncs and moves with it.
 - Use the **filter chips** to see one list at a time. Use **‹ ›** or tap the date to
   look at another day.
 - Tap the big **+** to add someone. Pick the list. For daily lists, also pick how long:
@@ -296,11 +301,12 @@ to give people at **https://theodramatist.github.io/Prayer-Tracker/everyone/inst
 It is the same app for anyone to use on their own phone: the Anglican Cycle of Prayer,
 their own church (they name it on first opening, then add its people, each on a day of
 the week or everyone every day), Prayer Requests, Family, the Prayers and Thanksgivings,
-the Collect of the Day in Rite One or Rite Two, pray-through, backups, and their own lists
-of any kind (a diocesan cycle can be pasted into a monthly list). It has no sync (so no
-GitHub or token to set up), no Share with Trinity, no Diocese of Wisconsin cycles, no
-Morning Prayer lists, and no Lesser Feasts and Fasts, whose text is under copyright: its
-calendar and collects are the Prayer Book's alone, which are in the public domain. The
+the Collect of the Day in Rite One or Rite Two, Reach out to, pray-through, backups, and
+their own lists of any kind (a diocesan cycle can be pasted into a monthly list). Lesser
+Feasts and Fasts works as here: each person loads their own copy of the Church's PDF,
+which stays on their phone. It has no sync (so no GitHub or token to set up), no Share
+with Trinity, no Diocese of Wisconsin cycles and no Morning Prayer lists. Everything built
+into it is the Prayer Book's, which is in the public domain. The
 Anglican Cycle of Prayer is © the Anglican Consultative Council and "may be freely copied,
 adapted, distributed and shared ... on the condition that no charge is made for its use",
 so the app stays free.
@@ -309,8 +315,8 @@ It is built from this app by `node scripts/build-public.mjs` into `everyone/`, w
 committed so GitHub Pages serves it. The build copies the app and swaps the full
 edition's own modules for the stand-ins in `edition/public/`, so their code and data
 aren't published there: `edition.js` (the edition's lists, storage and wording),
-`share-ui.js`, `extras.js` (the Settings cards for Lesser Feasts and Fasts, Trinity and
-sync), `sync.js`, `lff.js` and `seeds.js`; `share.js` and `data/diocese.js` are left out.
+`share-ui.js`, `extras.js` (the Settings cards: the public one has only Lesser Feasts and
+Fasts), `sync.js` and `seeds.js`; `share.js` and `data/diocese.js` are left out.
 **Run the build after every change, before committing**: a unit test fails if `everyone/`
 is out of date, or if anything of the full edition's own (Trinity's form, your name, the
 diocese's cycles, the GitHub sync, Lesser Feasts and Fasts) turns up in it.
