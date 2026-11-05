@@ -1,4 +1,4 @@
-// Bottom sheets: quick add, edit an item, share a request with Trinity,
+// Bottom sheets: quick add, edit an item,
 // paste a list, list settings, and spreading a weekly list over the week.
 
 import { h, icon, replace, openSheet, confirmSheet, toast, chipGroup, toggle, autoGrow, plural, prayerBody } from './ui.js';
@@ -6,7 +6,8 @@ import { DURATIONS, endDateFor, sortItems, nameOf, planSpread, LIST_TYPES, SORTS
 import { SOURCE as PRAYER_SOURCE, SECTIONS, DEFAULT_PRAYERS, DEFAULT_RITE, RITES, prayersFor, prayerById, prayerText, firstWords, itemPrayer, isPrayerItem, renderedByApp } from './prayers.js';
 import { bundleFor } from './bundles.js';
 import { seedFor } from './seeds.js';
-import { TRINITY_FORM, prefilledUrl, queueShare, cancelShare, flushOutbox, shareName, sharingChoice } from './share.js';
+import { canShare, shareFields, queueShares, cancelShares, sharingNote, sendSharesSoon, sharedNote, shareButton } from './share-ui.js';
+import { EDITION } from './edition.js';
 import { parseList, parseWeekly, parseMonthly, parseDated } from './importer.js';
 import { parseName, compareNames } from './names.js';
 import { WEEKDAYS, WEEKDAYS_SHORT, addDays, diffDays, formatShort, formatMedium, formatWithYear, weekday, parseKey, isValidKey, todayKey } from './dates.js';
@@ -175,112 +176,6 @@ function dateInput(value, onChange, label = 'Date') {
 
 const TYPE_ORDER = ['daily', 'weekly', 'monthly', 'dated'];
 
-// ---------- sharing a request with Trinity ----------
-
-/** Lists whose entries can be shared with Trinity's prayer list: your own daily ones. */
-export const canShare = (list) => list?.type === 'daily';
-
-/**
- * Trinity's prayer request form, under a "Share with Trinity" switch (unless
- * `fixed`). Your name comes from Settings and the request is the entry as you
- * wrote it, so only the form's other two questions are asked here. The
- * sharing choice is remembered for next time.
- */
-function shareFields(app, { fixed = false, preview = null } = {}) {
-  const { store } = app;
-  const form = TRINITY_FORM;
-  let on = fixed;
-  let died = false;
-  let sharing = sharingChoice(store);
-  const group = `share-${Math.random().toString(36).slice(2, 8)}`;
-  const choices = h('div', { class: 'radio-list', role: 'radiogroup', 'aria-label': 'Who would you like your prayer request shared with?' },
-    form.sharing.map((choice) => h('label', { class: 'radio-row' },
-      h('input', { type: 'radio', name: group, value: choice, checked: choice === sharing, onchange: () => { sharing = choice; } }),
-      h('span', null, choice))));
-  const answers = (request) => ({ name: shareName(store), request, died, sharing });
-
-  const body = h('div', { class: 'share-body', hidden: !on },
-    h('p', { class: 'hint share-from' }, `From ${shareName(store)}, with the request as you wrote it${fixed ? '' : ' above'}. Details stay private.`),
-    preview && h('blockquote', { class: 'share-preview' }, preview),
-    field('Is this a prayer request for someone who has died?', chipGroup({
-      label: 'Is this a prayer request for someone who has died?',
-      value: 'no',
-      options: [{ value: 'no', label: 'No' }, { value: 'yes', label: 'Yes' }],
-      onChange: (v) => { died = v === 'yes'; },
-    })),
-    field('Who would you like your prayer request shared with?', choices),
-    h('p', { class: 'hint' }, 'Trinity prays for a request for one month. For an ongoing one, share it again each month: tap it, then Share with Trinity again.'),
-    fixed && preview && h('a', {
-      class: 'link-btn share-open',
-      href: form.view,
-      target: '_blank',
-      rel: 'noopener',
-      onclick: (e) => { e.currentTarget.href = prefilledUrl(form, answers(preview)); },
-    }, icon('link'), 'Or open the form itself, filled in'));
-
-  let onToggle = null;
-  const toggleRow = !fixed && toggle({
-    label: 'Share with Trinity',
-    hint: 'Also send this request to Trinity’s prayer list.',
-    checked: false,
-    onChange: (v) => {
-      on = v;
-      body.hidden = !v;
-      onToggle?.(v);
-    },
-  });
-
-  return {
-    el: h('div', { class: 'share' }, toggleRow, body),
-    get on() { return on; },
-    set onToggle(fn) { onToggle = fn; },
-    /** The form's answers for one request. */
-    answers,
-    /** Remember the sharing choice for next time. */
-    remember() {
-      const prev = store.state.settings.share?.[form.id] || {};
-      if (prev.sharing !== sharing) store.setSetting('share', { ...(store.state.settings.share || {}), [form.id]: { ...prev, sharing } });
-    },
-  };
-}
-
-/** Send what's waiting once the Undo moment has passed, and say how it went. */
-function sendSharesSoon(app) {
-  setTimeout(async () => {
-    const { sent, waiting } = await flushOutbox(app.store);
-    if (sent) toast(sent === 1 ? 'Sent to Trinity’s prayer list' : `Sent ${sent} requests to Trinity’s prayer list`);
-    else if (waiting) toast('No connection yet. It will go to Trinity when you’re back online.');
-  }, app.shareDelay ?? 5500);
-}
-
-/** Share an entry already on a list with Trinity (again, for an ongoing request). */
-export function openShareSheet(app, itemId) {
-  const { store } = app;
-  const found = store.findItem(itemId);
-  if (!found) return null;
-  const { item } = found;
-  const share = shareFields(app, { fixed: true, preview: item.text });
-  const last = item.shared?.[TRINITY_FORM.id];
-  const submit = h('button', { class: 'btn btn-primary btn-block', type: 'submit' }, last ? 'Send to Trinity again' : 'Send to Trinity');
-  const form = h('form', { class: 'share-form', novalidate: true },
-    h('p', { class: 'sheet-text' }, last
-      ? `Shared with Trinity on ${formatWithYear(last)}. Trinity prays for a request for a month, so send it again to keep it on their list.`
-      : 'Sends this request to Trinity’s prayer list through the parish’s prayer request form.'),
-    share.el,
-    h('div', { class: 'sheet-actions' }, submit));
-  let sheet;
-  form.addEventListener('submit', (e) => {
-    e.preventDefault();
-    share.remember();
-    const job = queueShare(store, { itemIds: [item.id], answers: share.answers(item.text) });
-    sheet.close();
-    toast('Sending to Trinity in a moment', { action: 'Undo', onAction: () => cancelShare(store, job) });
-    sendSharesSoon(app);
-  });
-  sheet = openSheet({ title: 'Share with Trinity', className: 'sheet-share', content: form });
-  return sheet;
-}
-
 /**
  * The main "add" sheet. Opens on the last list used, with that list's last
  * duration. Several lines add several entries.
@@ -432,20 +327,15 @@ export function openAddSheet(app, { text = '', listId = null, date = null, day: 
       s.meta.quickAddList = list.id;
       if (list.type === 'daily') s.meta.durations = { ...s.meta.durations, [list.id]: duration };
     }, { silent: true });
-    // Each request goes to Trinity as its own response, worded as you wrote it.
-    const jobs = [];
-    if (sharing && added.length) {
-      share.remember();
-      for (const i of added) jobs.push(queueShare(store, { itemIds: [i.id], answers: share.answers(i.text) }));
-    }
+    const jobs = sharing && added.length ? queueShares(app, share, added) : [];
     requestPersistentStorage();
     sheet.close();
     const where = describeSchedule(list, added[0]);
     const what = added.length === 1 ? `Added “${short(added[0].text, 32)}” to ${list.name}${where}` : `Added ${added.length} to ${list.name}${where}`;
-    toast(jobs.length ? `${what}. Sharing with Trinity…` : what, {
+    toast(`${what}${sharingNote(jobs)}`, {
       action: 'Undo',
       onAction: () => {
-        for (const job of jobs) cancelShare(store, job);
+        cancelShares(app, jobs);
         for (const i of added) store.deleteItem(i.id);
       },
     });
@@ -546,13 +436,9 @@ export function openItemSheet(app, itemId, { list: inList = null, entry = null }
   const details = [];
   if (item.created) details.push(`Added ${formatWithYear(todayKey(new Date(item.created)))}`);
   if (item.start && list.type === 'daily') details.push(`first day ${formatMedium(item.start)}`);
-  const sharedOn = item.shared?.[TRINITY_FORM.id];
-  if (sharedOn) details.push(`shared with Trinity ${formatMedium(sharedOn)}`);
-  const shareBtn = canShare(list) && h('button', {
-    class: 'link-btn',
-    type: 'button',
-    onclick: () => { sheet.close(); openShareSheet(app, item.id); },
-  }, icon('upload'), sharedOn ? 'Share with Trinity again' : 'Share with Trinity');
+  const shared = sharedNote(item);
+  if (shared) details.push(shared);
+  const shareBtn = canShare(list) && shareButton(app, item, () => sheet.close());
 
   const save = h('button', { class: 'btn btn-primary', type: 'submit' }, 'Save');
   const del = h('button', { class: 'btn btn-danger', type: 'button' }, icon('trash'), 'Delete');
@@ -945,7 +831,7 @@ export function openListSheet(app, listId = null) {
       onChange: (v) => { sort = v; },
     })),
     existing && toggle({ label: 'Show on Today', checked: !hidden, onChange: (v) => { hidden = !v; } }),
-    existing && toggle({
+    existing && EDITION.morningPrayer && toggle({
       label: 'Read at Morning Prayer',
       hint: existing.type === 'weekly'
         ? 'Each weekday’s names also come up on Today as one list to read aloud, marked once for the whole list. Names only; notes stay private.'
@@ -954,8 +840,10 @@ export function openListSheet(app, listId = null) {
       onChange: (v) => { morningPrayer = v; },
     }),
     existing?.type === 'weekly' && toggle({
-      label: 'Everyone, every day, in my own prayer',
-      hint: 'Everyone on the list comes up every day to pray for one by one, apart from Morning Prayer. Off: only that day’s names.',
+      label: EDITION.morningPrayer ? 'Everyone, every day, in my own prayer' : 'Everyone, every day',
+      hint: EDITION.morningPrayer
+        ? 'Everyone on the list comes up every day to pray for one by one, apart from Morning Prayer. Off: only that day’s names.'
+        : 'Everyone on the list comes up every day. Off: only the names for that day of the week.',
       checked: everyDay,
       onChange: (v) => { everyDay = v; },
     }),

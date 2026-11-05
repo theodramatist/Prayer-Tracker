@@ -81,6 +81,7 @@ export const DEFAULT_PRAYERS = {
   diocese: ['p10'],
   'diocese-daily': ['p9'],
   trinity: ['p11'],
+  parish: ['p11'],
   requests: ['vigil', 'p2'],
   family: ['p54'],
   clergy: ['p9'],

@@ -6,6 +6,7 @@
 import { SCHEMA, migrate, syncDocument, keepTombstone } from './store.js';
 import { addDays, todayKey } from './dates.js';
 
+export const SYNC_AVAILABLE = true;
 const CONFIG_KEY = 'prayer-tracker:sync';
 /** Lesser Feasts and Fasts goes in a file of its own, written once each time it's loaded. */
 export const LFF_FILE = 'lesser-feasts-and-fasts.json';

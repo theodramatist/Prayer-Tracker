@@ -1219,6 +1219,117 @@ await step('on a computer: the same two-column Morning Prayer list, and list chi
   await desk.close();
 });
 
+console.log(' Part 3: the public edition, beside the full one on the same device');
+// Service workers on, as on a phone, since both editions share one web address.
+const context3 = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale: 'en-US', timezoneId: 'America/New_York' });
+page = await context3.newPage();
+await page.clock.setFixedTime(new Date('2026-11-04T09:00:00-05:00')); // a Wednesday
+const problems3 = [];
+page.on('pageerror', (e) => problems3.push(`pageerror: ${e.message}`));
+page.on('console', (m) => { if (m.type() === 'error') problems3.push(`console: ${m.text()}`); });
+const PUBLIC = `${BASE}everyone/`;
+let personalData = null;
+
+await step('the full edition is installed first, with its offline copy', async () => {
+  await page.goto(BASE);
+  await page.locator('.day-head h1').waitFor();
+  await page.evaluate(() => navigator.serviceWorker.ready);
+  personalData = await page.evaluate(() => localStorage.getItem('prayer-tracker:data'));
+  assert.ok(personalData && JSON.parse(personalData).lists.some((l) => l.id === 'trinity'));
+});
+
+await step('the public edition opens at everyone/: the Anglican Cycle, your church, your own lists, the Collect of the Day', async () => {
+  await page.goto(PUBLIC);
+  await page.locator('.day-head h1').waitFor();
+  assert.deepEqual(await page.evaluate(() => window.prayerTracker.store.state.lists.map((l) => l.id)), ['anglican', 'parish', 'requests', 'family', 'prayers']);
+  assert.equal(await page.locator('.office').count(), 0); // no Morning Prayer lists
+  assert.ok(await page.locator('.group[data-list=anglican] .item-text').count() >= 1);
+  assert.equal(await page.locator('.collect-day').getAttribute('data-collect'), 'proper-26');
+  assert.equal(await page.locator('.setup-card[data-list=parish] h2').innerText(), 'My Church');
+  await shot('50-public-first-run');
+});
+
+await step('public: name your church, then add its people', async () => {
+  const input = page.locator('.setup-card[data-list=parish] .setup-name input');
+  await input.fill('St. Example’s');
+  await input.press('Enter');
+  await eventually(async () => assert.equal(await page.locator('.setup-card[data-list=parish] h2').innerText(), 'St. Example’s'));
+  await page.locator('.setup-card[data-list=parish] button', { hasText: 'Add one' }).click();
+  const sheet = page.locator('.sheet-add');
+  await sheet.waitFor();
+  await sheet.locator('textarea.add-text').fill('Ann Example');
+  await sheet.locator('button[type=submit]').click();
+  await sheet.waitFor({ state: 'detached' });
+  assert.equal(await page.evaluate(() => window.prayerTracker.store.list('parish').items.length), 1);
+});
+
+await step('public: a prayer request has no Share with Trinity', async () => {
+  await page.click('.tab-add');
+  const sheet = page.locator('.sheet-add');
+  await sheet.waitFor();
+  await sheet.locator('.chips-lists .chip', { hasText: 'Prayer Requests' }).click();
+  assert.equal(await sheet.locator('text=Share with Trinity').count(), 0);
+  assert.ok(!(await sheet.innerText()).includes('Trinity'));
+  await sheet.locator('textarea.add-text').fill('Pat – surgery Friday');
+  await sheet.locator('button[type=submit]').click();
+  await sheet.waitFor({ state: 'detached' });
+  assert.deepEqual(await texts('.group[data-list=requests] .item-text'), ['Pat – surgery Friday']);
+});
+
+await step('public: Settings has no sync, Trinity or Lesser Feasts and Fasts, and says the list stays on the phone', async () => {
+  await page.click('.tabbar a[href="#/lists"]');
+  await page.click('a[href="#/settings"]');
+  await page.locator('.settings-card h2').first().waitFor();
+  const titles = (await texts('.settings-card h2')).map((t) => t.toLowerCase());
+  for (const gone of ['Lesser Feasts and Fasts', 'Sharing with Trinity', 'Sync across devices']) assert.ok(!titles.includes(gone.toLowerCase()), gone);
+  for (const kept of ['Appearance', 'Prayers', 'Backup', 'Home Screen', 'About']) assert.ok(titles.includes(kept.toLowerCase()), `${kept}: ${titles}`);
+  assert.match(await page.locator('.settings-card', { hasText: 'About' }).innerText(), /Nothing you enter leaves this device: there are no accounts and no tracking\./);
+  assert.match(await page.locator('.settings-card', { hasText: 'About' }).innerText(), /Book of Common Prayer \(1979\), which is in the public domain/);
+  // A list's settings: no Morning Prayer, and "everyone every day" for your church.
+  await page.click('.tabbar a[href="#/lists"]');
+  await page.locator('a', { hasText: 'St. Example’s' }).first().click();
+  await page.locator('button[aria-label="List settings"]').first().click();
+  const listSheet = page.locator('.sheet').last();
+  await listSheet.waitFor();
+  assert.equal(await listSheet.locator('text=Read at Morning Prayer').count(), 0);
+  assert.equal(await listSheet.locator('.toggle-label', { hasText: /^Everyone, every day$/ }).count(), 1);
+  await page.keyboard.press('Escape');
+  await goToday();
+});
+
+await step('the two editions keep their data apart, and both offline copies stay', async () => {
+  assert.equal(await page.evaluate(() => localStorage.getItem('prayer-tracker:data')), personalData);
+  const pub = await page.evaluate(() => JSON.parse(localStorage.getItem('prayer-tracker-public:data')));
+  assert.equal(pub.lists.find((l) => l.id === 'parish').name, 'St. Example’s');
+  await page.evaluate(() => navigator.serviceWorker.ready);
+  await eventually(async () => {
+    const keys = await page.evaluate(() => caches.keys());
+    assert.ok(keys.some((k) => /^prayer-tracker-\d/.test(k)), `${keys}`);
+    assert.ok(keys.some((k) => /^prayer-tracker-public-\d/.test(k)), `${keys}`);
+  }, 8000);
+  // The full edition still opens at its own address, and the public one at its.
+  await page.goto(BASE);
+  await page.locator('.day-head h1').waitFor();
+  assert.ok(await page.evaluate(() => window.prayerTracker.store.state.lists.some((l) => l.id === 'trinity')));
+  await page.goto(PUBLIC);
+  await page.locator('.day-head h1').waitFor();
+  assert.ok(await page.evaluate(() => window.prayerTracker.store.state.lists.some((l) => l.id === 'parish')));
+});
+
+await step('public: the page of instructions for getting it on a phone', async () => {
+  await page.goto(`${PUBLIC}install.html`);
+  assert.match(await page.locator('main').innerText(), /Add to Home Screen[\s\S]*Install app[\s\S]*stays on your phone/);
+  assert.match(await page.locator('#address').innerText(), /everyone\/$/);
+  await shot('51-public-install-page');
+  await page.locator('a.open').click();
+  await page.locator('.day-head h1').waitFor();
+});
+
+await step('no errors in the console (part 3)', async () => {
+  assert.deepEqual(problems3, []);
+});
+await context3.close();
+
 await writeFile(`${OUT}summary.txt`, `${passed} steps passed\n`);
 console.log(`\n${passed} steps passed`);
 await browser.close();

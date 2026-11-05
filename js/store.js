@@ -9,9 +9,10 @@
 import { addDays, todayKey, isValidKey } from './dates.js';
 import { parseName } from './names.js';
 import { planSpread } from './schedule.js';
+import { EDITION } from './edition.js';
 
 export const SCHEMA = 2;
-export const STORAGE_KEY = 'prayer-tracker:data';
+export const STORAGE_KEY = `${EDITION.storage}:data`;
 const CHECK_RETENTION_DAYS = 120;
 const TOMBSTONE_RETENTION_DAYS = 180;
 
@@ -39,7 +40,7 @@ export const LIST_TYPES = new Set(['daily', 'weekly', 'monthly', 'dated', 'cycle
 
 /** Entries copied in from a built-in cycle (see seeds.js) have ids starting with this. */
 export const SEED_PREFIX = 'seed-';
-const DEFAULT_LIST_IDS = new Set(['anglican', 'diocese', 'diocese-daily', 'trinity', 'requests', 'family', 'clergy', 'prayers']);
+const DEFAULT_LIST_IDS = new Set(EDITION.lists((props) => props).map((l) => l.id));
 
 /**
  * Tombstones that are never forgotten: for built-in entries and the lists the
@@ -53,18 +54,7 @@ export function defaultState(now = Date.now(), today = todayKey()) {
   const list = (props) => ({ sort: 'added', items: [], updated: 0, since: today, ...props });
   return {
     schema: SCHEMA,
-    lists: [
-      list({ id: 'anglican', name: 'Anglican Cycle of Prayer', type: 'cycle', kind: 'acp', source: 'acp' }),
-      list({ id: 'diocese', name: 'Diocesan Cycle', type: 'monthly' }),
-      list({ id: 'diocese-daily', name: 'Diocesan Daily Cycle', type: 'dated' }),
-      // Read at Morning Prayer a weekday at a time; in your own prayer, everyone every day.
-      list({ id: 'trinity', name: 'Trinity', type: 'weekly', sort: 'last', morningPrayer: true, everyDay: true }),
-      list({ id: 'requests', name: 'Prayer Requests', type: 'daily' }),
-      list({ id: 'family', name: 'Family', type: 'daily' }),
-      list({ id: 'clergy', name: 'Clergy', type: 'daily', sort: 'last' }),
-      // Prayers and thanksgivings from the Prayer Book, chosen to pray one by one.
-      list({ id: 'prayers', name: 'Prayers and Thanksgivings', type: 'daily', kind: 'prayers' }),
-    ],
+    lists: EDITION.lists(list),
     checks: {},
     tombstones: {},
     settings: { palette: 'burgundy', foldShortMonths: true, theme: 'auto', showPrayers: true, showCollect: true, rite: 'contemporary', updated: 0 },
@@ -100,13 +90,7 @@ export function migrate(data, now = Date.now(), today = todayKey()) {
         list.type = 'cycle';
         list.source = 'acp';
       }
-      // Before 2.3 the parish list was only a weekly list. It is now read at
-      // Morning Prayer, with everyone every day in your own prayer, unless
-      // you have chosen otherwise.
-      if (l.id === 'trinity' && l.type === 'weekly' && l.morningPrayer === undefined && l.everyDay === undefined) {
-        list.morningPrayer = true;
-        list.everyDay = true;
-      }
+      EDITION.migrateList(l, list);
       return list;
     });
   return {
@@ -404,7 +388,7 @@ export class Store {
     });
   }
 
-  /** Note that an entry was shared somewhere (say, Trinity's prayer list) on a date. */
+  /** Note that an entry was shared somewhere (say, a parish's prayer list) on a date. */
   markShared(itemId, where, dateKey) {
     return this.commit(() => {
       const found = this.findItem(itemId);

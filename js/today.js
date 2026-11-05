@@ -421,13 +421,35 @@ const SETUP = {
   },
 };
 
+/** Your church's name, for the list of its people (the public edition starts it as "My Church"). */
+function churchName(app, list) {
+  const input = h('input', {
+    class: 'input',
+    value: list.name === 'My Church' ? '' : list.name,
+    placeholder: 'For example, St. Mark’s',
+    autocapitalize: 'words',
+    'aria-label': 'Your church’s name',
+  });
+  const save = () => {
+    const name = input.value.trim();
+    if (name && name !== list.name) app.store.updateList(list.id, { name });
+  };
+  input.addEventListener('change', save);
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); save(); } });
+  return h('label', { class: 'field setup-name' }, h('span', { class: 'field-label' }, 'Your church'), input);
+}
+
 function setupCard(app, list) {
   const copy = SETUP[list.type];
   const seeded = seedFor(list.id);
   const fromSeed = seeded && seeded.part.list.type === list.type;
+  const parish = list.id === 'parish';
   return h('section', { class: 'setup-card', 'data-list': list.id },
     h('h2', null, list.name),
-    h('p', null, list.type === 'cycle' && list.kind !== 'acp' ? 'Paste in the cycle: each day’s entry starting with its date.' : copy.text),
+    parish && churchName(app, list),
+    h('p', null, list.type === 'cycle' && list.kind !== 'acp' ? 'Paste in the cycle: each day’s entry starting with its date.'
+      : parish ? 'Add the people of your church to pray for, each on a day of the week (or everyone every day, from the list’s settings). Type them First Last; they’ll be sorted by last name.'
+        : copy.text),
     h('div', { class: 'setup-actions' },
       fromSeed && h('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: () => loadSeed(app, list.id) }, icon('check'), `Use ${seeded.part.label}`),
       h('button', { class: `btn btn-sm ${fromSeed ? '' : 'btn-primary'}`, type: 'button', onclick: () => openImportSheet(app, list.id) }, icon('paste'), copy.paste),

@@ -4,6 +4,12 @@ A web app for daily intercessions that you install on your phone's Home Screen. 
 works offline, keeps everything on your device, and can sync between your devices
 through a private GitHub repository of your own.
 
+There are two editions. This one, the **full edition**, is set up for one person's use:
+the Diocese of Wisconsin's cycles, Trinity read at Morning Prayer, Share with Trinity,
+sync, and Lesser Feasts and Fasts. The **public edition**, for anyone, is at
+**https://theodramatist.github.io/Prayer-Tracker/everyone/** (see
+[The public edition](#the-public-edition)).
+
 It keeps several kinds of cycle, and shows everything due on a given day in one place:
 
 | Cycle | Repeats | Comes set up as |
@@ -282,13 +288,46 @@ a backup** now and then. On a phone this opens the share sheet, so you can save 
 file to Files, iCloud Drive, Google Drive or email. **Restore a backup** brings
 everything back on a new phone.
 
+## The public edition
+
+**https://theodramatist.github.io/Prayer-Tracker/everyone/**, with a page of instructions
+to give people at **https://theodramatist.github.io/Prayer-Tracker/everyone/install.html**.
+
+It is the same app for anyone to use on their own phone: the Anglican Cycle of Prayer,
+their own church (they name it on first opening, then add its people, each on a day of
+the week or everyone every day), Prayer Requests, Family, the Prayers and Thanksgivings,
+the Collect of the Day in Rite One or Rite Two, pray-through, backups, and their own lists
+of any kind (a diocesan cycle can be pasted into a monthly list). It has no sync (so no
+GitHub or token to set up), no Share with Trinity, no Diocese of Wisconsin cycles, no
+Morning Prayer lists, and no Lesser Feasts and Fasts, whose text is under copyright: its
+calendar and collects are the Prayer Book's alone, which are in the public domain. The
+Anglican Cycle of Prayer is © the Anglican Consultative Council and "may be freely copied,
+adapted, distributed and shared ... on the condition that no charge is made for its use",
+so the app stays free.
+
+It is built from this app by `node scripts/build-public.mjs` into `everyone/`, which is
+committed so GitHub Pages serves it. The build copies the app and swaps the full
+edition's own modules for the stand-ins in `edition/public/`, so their code and data
+aren't published there: `edition.js` (the edition's lists, storage and wording),
+`share-ui.js`, `extras.js` (the Settings cards for Lesser Feasts and Fasts, Trinity and
+sync), `sync.js`, `lff.js` and `seeds.js`; `share.js` and `data/diocese.js` are left out.
+**Run the build after every change, before committing**: a unit test fails if `everyone/`
+is out of date, or if anything of the full edition's own (Trinity's form, your name, the
+diocese's cycles, the GitHub sync, Lesser Feasts and Fasts) turns up in it.
+
+Both editions live at the same web address, so the public one keeps its data under its
+own keys (`prayer-tracker-public:…`) and its own offline cache, and each edition's service
+worker leaves the other's files and cache alone; a browser test installs both on one
+device and checks they stay apart.
+
 ## Development
 
 Requires Node 20+ and no dependencies.
 
 ```
 npm start           # serve the app at http://localhost:8080
-npm test            # unit tests: dates, names, cycles, carry-forward, church calendar, collects, importers, storage, the diocese's cycles, sync, PWA files
+npm test            # unit tests: dates, names, cycles, carry-forward, church calendar (and its rules over 400 years), collects, Lesser Feasts and Fasts, importers, storage, sync, PWA files, the public edition
+node scripts/build-public.mjs   # rebuild the public edition in everyone/
 npm run test:e2e    # drives the app in Chromium with Playwright; screenshots in tests/e2e/output/
 npm run icons       # re-render the PNG icons from the SVG artwork
 ```
@@ -317,7 +356,10 @@ Layout: `index.html`, `css/app.css`, and ES modules in `js/`:
   last-name sorting.
 - `store.js` handles storage, with per-entry timestamps and tombstones; `sync.js`
   handles the merge and the GitHub file.
-- `today.js`, `praythrough.js`, `lists.js`, `sheets.js` and `settings.js` are the screens.
+- `today.js`, `praythrough.js`, `lists.js`, `sheets.js` and `settings.js` are the screens;
+  `share-ui.js` (Share with Trinity) and `extras.js` (the Settings cards for Lesser Feasts
+  and Fasts, Trinity and sync) are the full edition's own, and `edition.js` says which
+  edition this is (see [The public edition](#the-public-edition)).
 
 `sw.js` is the offline cache, and `manifest.webmanifest` makes the app installable.
 

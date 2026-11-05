@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <title>Prayer Tracker</title>
+  <meta name="description" content="Daily intercessions: the Anglican Cycle of Prayer, your church, and your own prayer list, with the Collect of the Day.">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#f6f0e8">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Prayers">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <script>
+    // Set the theme and colours before the first paint.
+    (function () {
+      var ui = {};
+      try { ui = JSON.parse(localStorage.getItem('prayer-tracker-public:ui') || '{}'); } catch (e) {}
+      var root = document.documentElement;
+      root.dataset.theme = ui.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      root.dataset.palette = ui.palette || 'burgundy';
+      root.dataset.season = ui.season || 'green';
+    })();
+  </script>
+  <link rel="preload" href="fonts/fraunces-latin-full-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/instrument-sans-latin-standard-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="css/app.css">
+  <script type="module" src="js/app.js"></script>
+</head>
+<body>
+  <main id="view" class="view" tabindex="-1"></main>
+
+  <nav class="tabbar" aria-label="Main">
+    <a class="tab" href="#/" data-tab="today">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/><circle cx="12" cy="15" r="1.6" fill="currentColor" stroke="none"/></svg>
+      <span>Today</span>
+    </a>
+    <button class="tab-add" type="button" aria-label="Add a name or prayer request">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+    </button>
+    <a class="tab" href="#/lists" data-tab="lists">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6.5h11M9 12h11M9 17.5h11"/><circle cx="4.5" cy="6.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="4.5" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="4.5" cy="17.5" r="1.2" fill="currentColor" stroke="none"/></svg>
+      <span>Lists</span>
+    </a>
+  </nav>
+
+  <noscript><p class="noscript">Prayer Tracker needs JavaScript turned on.</p></noscript>
+</body>
+</html>

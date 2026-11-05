@@ -174,7 +174,7 @@ export function renderListDetail(app, id) {
     ? [LIST_TYPES.cycle.label, src ? `${plural(src.length, 'day')} from ${formatWithYear(src.start)}, then it starts over` : 'nothing added yet']
     : [LIST_TYPES[list.type].label, `ordered by ${SORTS[list.sort].toLowerCase()}`];
   if (list.morningPrayer) sub.push('read at Morning Prayer');
-  if (list.type === 'weekly' && list.everyDay) sub.push('everyone every day in your own prayer');
+  if (list.type === 'weekly' && list.everyDay) sub.push(list.morningPrayer ? 'everyone every day in your own prayer' : 'everyone every day');
   if (list.hidden) sub.push('hidden from Today');
 
   return [

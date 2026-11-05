@@ -629,7 +629,7 @@ code { font: 0.92em/1 ui-monospace, "SF Mono", Menlo, monospace; padding: 1px 5p
 .office-foot { display: flex; justify-content: flex-end; margin-top: 10px; }
 .office-list.done .office-names { color: var(--text-3); }
 
-/* Share with Trinity: the parish form's questions, under the switch. */
+/* Sharing a request with a parish's prayer list (full edition): the form's questions, under the switch. */
 .share { margin-top: 12px; }
 .share-body {
   margin-top: 6px;
@@ -756,6 +756,7 @@ code { font: 0.92em/1 ui-monospace, "SF Mono", Menlo, monospace; padding: 1px 5p
 }
 .setup-card { border: 1.5px dashed var(--line-strong); background: transparent; }
 .setup-card h2 { font-size: 20px; margin-bottom: 4px; }
+.setup-name { display: grid; gap: 4px; margin: 6px 0 10px; }
 .setup-card p, .notice-card p, .empty-card p, .banner p { color: var(--text-2); font-size: 15.5px; }
 .setup-actions, .banner-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
 .notice-card { background: var(--warn-bg); }

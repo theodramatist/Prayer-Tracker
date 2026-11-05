@@ -5,10 +5,10 @@ import { todayKey, formatWithYear } from './dates.js';
 import { dayTitle } from './calendar.js';
 import { VERSION } from './version.js';
 import { SEEDS } from './seeds.js';
-import { TRINITY_FORM, shareName, pendingShares } from './share.js';
 import { RITES, DEFAULT_RITE } from './prayers.js';
 import { openPrayerPicker } from './sheets.js';
-import { LFF_URL, readLffPdf } from './lff.js';
+import { extraCards } from './extras.js';
+import { EDITION } from './edition.js';
 
 const field = (label, ...children) => h('div', { class: 'field' }, h('span', { class: 'field-label' }, label), children);
 const card = (title, ...children) => h('section', { class: 'settings-card' }, h('h2', null, title), children);
@@ -74,167 +74,6 @@ export function restoreBackup(app) {
   });
   document.body.append(input);
   input.click();
-}
-
-function ago(ms) {
-  const mins = Math.round((Date.now() - ms) / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins} minute${mins === 1 ? '' : 's'} ago`;
-  const hours = Math.round(mins / 60);
-  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
-  return formatWithYear(todayKey(new Date(ms)));
-}
-
-/**
- * Lesser Feasts and Fasts, from your own copy of the PDF: read on this
- * device, kept here, and passed to your other devices only by your own sync.
- */
-function lffCard(app) {
-  const { store, lff } = app;
-  const s = store.state.settings;
-  const current = store.state.library?.lff;
-  const status = h('p', { class: 'hint lff-status', 'aria-live': 'polite' });
-  const input = h('input', { type: 'file', accept: '.pdf,application/pdf', hidden: true });
-  const choose = h('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: () => input.click() }, icon('upload'), lff.data ? 'Load a newer copy' : 'Choose the PDF');
-  input.addEventListener('change', async () => {
-    const file = input.files?.[0];
-    input.value = '';
-    if (!file) return;
-    choose.disabled = true;
-    status.classList.remove('is-error');
-    status.textContent = 'Opening the PDF…';
-    try {
-      const book = await readLffPdf(file, (p, n) => { status.textContent = `Reading page ${p} of ${n}…`; });
-      if (!book.feasts.length) throw new Error('Couldn’t find the lesser feasts in this PDF.');
-      if (!app.setLff(book)) throw new Error('There isn’t room to keep it on this device.');
-      const missed = book.problems.length ? ` (${book.problems.length} couldn’t be read)` : '';
-      toast(`${book.title}: ${book.feasts.length} lesser feasts added${missed}`);
-      app.render();
-    } catch (e) {
-      status.textContent = e?.message || 'That PDF couldn’t be read.';
-      status.classList.add('is-error');
-      choose.disabled = false;
-    }
-  });
-  const link = h('a', { href: LFF_URL, target: '_blank', rel: 'noopener' }, 'Download the PDF from the Episcopal Church');
-
-  if (lff.data) {
-    return card('Lesser Feasts and Fasts',
-      h('p', null, h('strong', null, lff.data.title), `: ${lff.data.feasts.length} lesser feasts, each with its collect in Rite One and Rite Two.`),
-      toggle({
-        label: 'Keep the lesser feasts',
-        hint: 'On a day with none of the Prayer Book’s own, a lesser feast names the day, and its collect is the Collect of the Day, with the Prayer Book’s as the other choice. They give way to Sundays, Principal Feasts and Holy Days, Ash Wednesday, and Holy Week and Easter Week; when they’re displaced, they aren’t kept that year.',
-        checked: s.lesserFeasts !== false,
-        onChange: (v) => store.setSetting('lesserFeasts', v),
-      }),
-      h('div', { class: 'button-row' },
-        choose,
-        h('button', {
-          class: 'btn btn-sm',
-          type: 'button',
-          onclick: async () => {
-            const ok = await confirmSheet({
-              title: 'Remove Lesser Feasts and Fasts?',
-              message: app.sync?.enabled ? 'It will be taken off this device and your other synced devices. You can load the PDF again at any time.' : 'It will be taken off this device. You can load the PDF again at any time.',
-              confirm: 'Remove',
-            });
-            if (!ok) return;
-            app.setLff(null);
-            toast('Lesser Feasts and Fasts removed');
-          },
-        }, 'Remove')),
-      status, input);
-  }
-  const elsewhere = current && !current.removed;
-  return card('Lesser Feasts and Fasts',
-    h('p', null, 'Add the lesser feasts to the calendar, each with its collect in Rite One or Rite Two, from your own copy of the book.'),
-    elsewhere && h('p', { class: 'hint' }, `${current.title || 'Lesser Feasts and Fasts'} was loaded on another of your devices${app.sync?.enabled ? ', and will come here with the next sync' : ''}. You can also load it here.`),
-    h('ol', { class: 'steps' },
-      h('li', null, link, ' (Lesser Feasts and Fasts 2024, free). On iPhone, open it, tap Share, then Save to Files.'),
-      h('li', null, 'Choose it here. It’s read on this device, which takes a moment.')),
-    h('div', { class: 'button-row' }, choose),
-    status, input,
-    h('p', { class: 'hint' }, 'The book is under copyright, so it isn’t built into the app: its collects stay on your devices and, if you sync, in your private repository.'));
-}
-
-/** Sharing requests with Trinity: the name they're sent under. */
-function shareCard(app) {
-  const { store } = app;
-  const form = TRINITY_FORM;
-  const waiting = pendingShares(store).length;
-  const name = h('input', {
-    class: 'input',
-    value: shareName(store),
-    autocomplete: 'name',
-    autocapitalize: 'words',
-    'aria-label': 'Your name on Trinity’s form',
-    onchange: (e) => {
-      const value = e.target.value.trim() || form.defaultName;
-      e.target.value = value;
-      const prev = store.state.settings.share?.[form.id] || {};
-      if (value !== shareName(store)) store.setSetting('share', { ...(store.state.settings.share || {}), [form.id]: { ...prev, name: value } });
-    },
-  });
-  return card('Sharing with Trinity',
-    h('p', null, 'Prayer requests you share with Trinity go to its prayer request form under this name, worded as you wrote them.'),
-    field('Your name (first and last)', name),
-    waiting > 0 && h('p', { class: 'hint' }, `${waiting === 1 ? 'One request is' : `${waiting} requests are`} waiting to go, and will be sent when there’s a connection.`));
-}
-
-function syncCard(app) {
-  const { sync } = app;
-  if (!sync) return null;
-  if (sync.enabled) {
-    const st = sync.status;
-    const line = st.state === 'syncing' ? 'Syncing…'
-      : st.state === 'error' ? st.message
-        : st.at ? `Last synced ${ago(st.at)}.` : 'Not synced yet.';
-    return card('Sync across devices',
-      h('p', null, 'Syncing with ', h('strong', null, sync.repo), ' on GitHub.'),
-      h('p', { class: `hint sync-status ${st.state === 'error' ? 'is-error' : ''}`, 'aria-live': 'polite' }, line),
-      h('div', { class: 'button-row' },
-        h('button', { class: 'btn btn-primary', type: 'button', disabled: st.state === 'syncing', onclick: () => sync.sync() }, 'Sync now'),
-        h('button', {
-          class: 'btn',
-          type: 'button',
-          onclick: async () => {
-            const ok = await confirmSheet({
-              title: 'Turn off sync on this device?',
-              message: 'Your lists stay on this device and in the repository; they just stop being kept in step here.',
-              confirm: 'Turn off',
-            });
-            if (ok) { sync.disconnect(); app.render(); }
-          },
-        }, 'Turn off')));
-  }
-  const repo = h('input', { class: 'input', placeholder: 'yourname/prayer-data', autocapitalize: 'none', autocomplete: 'off', spellcheck: 'false', 'aria-label': 'Repository' });
-  const token = h('input', { class: 'input', type: 'password', placeholder: 'github_pat_…', autocomplete: 'off', 'aria-label': 'Access token' });
-  const status = h('p', { class: 'hint sync-status', 'aria-live': 'polite' });
-  const connect = h('button', { class: 'btn btn-primary', type: 'submit' }, 'Connect');
-  const form = h('form', { class: 'sync-form', novalidate: true }, field('Repository', repo), field('Access token', token), status, connect);
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    connect.disabled = true;
-    status.classList.remove('is-error');
-    status.textContent = 'Connecting…';
-    try {
-      await sync.connect(repo.value, token.value);
-      toast('Sync is on');
-      app.render();
-    } catch (err) {
-      status.textContent = err.message;
-      status.classList.add('is-error');
-      connect.disabled = false;
-    }
-  });
-  return card('Sync across devices',
-    h('p', null, 'Keep the same lists on your phone, iPad and computer. They’re saved as one file in a private GitHub repository of your own, and each device keeps working offline.'),
-    h('ol', { class: 'steps' },
-      h('li', null, 'On GitHub, create a new ', h('strong', null, 'private'), ' repository, for example ', h('code', null, 'prayer-data'), '.'),
-      h('li', null, 'Make a ', h('a', { href: 'https://github.com/settings/personal-access-tokens/new', target: '_blank', rel: 'noopener' }, 'fine-grained access token'),
-        '. Under Repository access choose “Only select repositories” and pick that repository; under Permissions set ', h('strong', null, 'Contents'), ' to “Read and write”.'),
-      h('li', null, 'Enter both below, and do the same on each device. The token stays on the device; it isn’t synced or put in backups.')),
-    form);
 }
 
 export function renderSettings(app) {
@@ -313,11 +152,8 @@ export function renderSettings(app) {
         h('button', { class: 'btn btn-sm', type: 'button', onclick: () => openPrayerPicker(app) }, icon('plus'), 'Choose prayers and thanksgivings')),
       h('p', { class: 'hint' }, 'Any of the Prayer Book’s Prayers and Thanksgivings, to pray one by one each day.')),
 
-    lffCard(app),
-
-    shareCard(app),
-
-    syncCard(app),
+    // The full edition's own cards (see extras.js).
+    ...extraCards(app),
 
     card('Monthly cycles',
       toggle({
@@ -339,7 +175,8 @@ export function renderSettings(app) {
     card('Home Screen', ...installSteps),
 
     card('About',
-      h('p', null, `Prayer Tracker ${VERSION}. Nothing you enter leaves this device: there are no accounts and no tracking.`),
+      h('p', null, `Prayer Tracker ${VERSION}. ${EDITION.privacy}`),
+      h('p', { class: 'hint' }, 'The prayers and collects are from the Book of Common Prayer (1979), which is in the public domain. The Anglican Cycle of Prayer is © the Anglican Consultative Council and is shared free of charge under its terms.'),
       h('button', {
         class: 'btn btn-danger',
         type: 'button',

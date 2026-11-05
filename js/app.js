@@ -5,6 +5,7 @@ import { Store, STORAGE_KEY } from './store.js';
 import { todayKey, addDays, isValidKey } from './dates.js';
 import { dayTitle } from './calendar.js';
 import { SyncManager } from './sync.js';
+import { EDITION } from './edition.js';
 import { LffLibrary } from './lff.js';
 import { trackVisualViewport, toast, closeAllSheets } from './ui.js';
 import { renderToday } from './today.js';
@@ -12,14 +13,14 @@ import { renderLists, renderListDetail } from './lists.js';
 import { renderSettings } from './settings.js';
 import { openAddSheet } from './sheets.js';
 import { SEEDS } from './seeds.js';
-import { flushOutbox, pendingShares } from './share.js';
+import { startSharing } from './share-ui.js';
 
-const UI_KEY = 'prayer-tracker:ui';
+const UI_KEY = `${EDITION.storage}:ui`;
 const root = document.documentElement;
 const view = document.getElementById('view');
 
 const store = new Store();
-for (const seed of SEEDS) store.seed(seed); // first run on this device: the diocese's cycles
+for (const seed of SEEDS) store.seed(seed); // first run on this device: the built-in cycles (full edition)
 const lff = new LffLibrary(store.storage);
 const sync = new SyncManager(store, { library: lff });
 
@@ -173,17 +174,8 @@ document.addEventListener('visibilitychange', syncIfOn);
 window.addEventListener('online', syncIfOn);
 setInterval(syncIfOn, 5 * 60 * 1000);
 
-// Prayer requests waiting to go to Trinity (shared while offline, say): sent
-// on opening, when the connection returns, and when the app comes back to the
-// front, but never while one can still be undone.
-const sendWaiting = async () => {
-  if (document.hidden || !pendingShares(store).length) return;
-  const { sent } = await flushOutbox(store, { minAge: app.shareDelay ?? 5000 });
-  if (sent) toast(sent === 1 ? 'Sent a waiting request to Trinity’s prayer list' : `Sent ${sent} waiting requests to Trinity’s prayer list`);
-};
-document.addEventListener('visibilitychange', sendWaiting);
-window.addEventListener('online', sendWaiting);
-setTimeout(sendWaiting, 3000);
+// Shared requests still waiting to go out (full edition only).
+startSharing(app);
 
 /** Midnight: move "today" forward (and the view with it, if it was showing today). */
 function checkRollover() {

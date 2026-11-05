@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Prayer Tracker: get it on your phone</title>
+  <meta name="description" content="How to put Prayer Tracker on your iPhone or Android phone: free, no account, and everything stays on your phone.">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <style>
+    @font-face { font-family: "Fraunces"; src: url("fonts/fraunces-latin-full-normal.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+    @font-face { font-family: "Fraunces"; src: url("fonts/fraunces-latin-full-italic.woff2") format("woff2"); font-style: italic; font-weight: 100 900; font-display: swap; }
+    @font-face { font-family: "Instrument Sans"; src: url("fonts/instrument-sans-latin-standard-normal.woff2") format("woff2"); font-weight: 400 700; font-display: swap; }
+    :root { --bg: #f6f0e8; --surface: #fdfaf5; --text: #261b19; --text-2: #5c4c47; --line: #e6dcd0; --accent: #8a2433; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #161110; --surface: #201816; --text: #f3ebe4; --text-2: #c4b4ab; --line: #3a2e2a; --accent: #e08a95; } }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.55 "Instrument Sans", system-ui, sans-serif; }
+    main { max-width: 640px; margin: 0 auto; padding: 32px 18px 56px; }
+    h1, h2 { font-family: "Fraunces", Georgia, serif; font-weight: 520; line-height: 1.2; }
+    h1 { font-size: 34px; margin: 0 0 6px; }
+    h2 { font-size: 22px; margin: 32px 0 10px; }
+    .lede { font-family: "Fraunces", Georgia, serif; font-style: italic; font-size: 19px; color: var(--text-2); margin: 0 0 22px; }
+    .card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 16px 18px; margin: 14px 0; }
+    .eyebrow { color: var(--accent); font-size: 12px; font-weight: 700; letter-spacing: .13em; text-transform: uppercase; margin: 0 0 6px; }
+    ol { margin: 0; padding-left: 22px; }
+    li + li { margin-top: 8px; }
+    a { color: var(--accent); }
+    .address { display: block; margin-top: 4px; font-size: 18px; font-weight: 650; word-break: break-all; }
+    .open { display: inline-block; margin-top: 12px; padding: 12px 20px; border-radius: 999px; background: var(--accent); color: var(--bg); font-weight: 650; text-decoration: none; }
+    .note { color: var(--text-2); font-size: 15px; }
+    ul { margin: 0; padding-left: 20px; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Prayer Tracker</h1>
+  <p class="lede">A daily prayer list: the Anglican Cycle of Prayer, the people of your church, your own prayer requests, and the Collect of the Day from the Book of Common Prayer, in Rite One or Rite Two.</p>
+
+  <div class="card">
+    <p class="eyebrow">The address</p>
+    <a class="address" id="address" href="./">theodramatist.github.io/Prayer-Tracker/everyone/</a>
+    <a class="open" href="./">Open Prayer Tracker</a>
+  </div>
+
+  <h2>On an iPhone or iPad</h2>
+  <div class="card">
+    <ol>
+      <li>Open the address above in <strong>Safari</strong>.</li>
+      <li>Tap the <strong>Share</strong> button (the square with an arrow pointing up).</li>
+      <li>Scroll down and tap <strong>Add to Home Screen</strong>, then <strong>Add</strong>.</li>
+      <li>Open <strong>Prayers</strong> from your Home Screen. It works like any other app, even with no connection.</li>
+    </ol>
+  </div>
+
+  <h2>On an Android phone</h2>
+  <div class="card">
+    <ol>
+      <li>Open the address above in <strong>Chrome</strong>.</li>
+      <li>Tap <strong>⋮</strong> (top right), then <strong>Install app</strong> or <strong>Add to Home screen</strong>.</li>
+      <li>Open <strong>Prayers</strong> from your Home screen or app drawer.</li>
+    </ol>
+  </div>
+
+  <h2>Getting started</h2>
+  <div class="card">
+    <ul>
+      <li>On the first screen, type your church’s name, then add its people. Each comes up on a day of the week (or everyone every day, if you prefer).</li>
+      <li>Tap <strong>+</strong> to add a prayer request, for a day, a week, a month, or until you take it off.</li>
+      <li>Tap the circle beside a name once you’ve prayed, or use <strong>Pray through the list</strong> to go one at a time.</li>
+      <li>In <strong>Settings</strong>, choose Rite One (traditional) or Rite Two (contemporary) language, and pick prayers from the Prayer Book’s Prayers and Thanksgivings.</li>
+    </ul>
+  </div>
+
+  <h2>Your list stays yours</h2>
+  <div class="card">
+    <ul>
+      <li>It’s free, with no account and no sign-in.</li>
+      <li>Everything you add stays on your phone; nothing is sent anywhere.</li>
+      <li>Because it’s kept only on your phone, save a backup now and then (Settings → Backup), and before you change phones. Removing the app, or clearing Safari’s website data, deletes your list.</li>
+      <li>New versions arrive by themselves.</li>
+    </ul>
+  </div>
+
+  <p class="note">The prayers and collects are from the Book of Common Prayer (1979), which is in the public domain. The Anglican Cycle of Prayer is © the Anglican Consultative Council and is shared free of charge under its terms.</p>
+</main>
+<script>
+  // Show the address this page was opened from, in case the app has moved.
+  (function () {
+    var a = document.getElementById('address');
+    var url = new URL('./', location.href);
+    if (url.protocol === 'https:') a.textContent = url.host + url.pathname;
+  })();
+</script>
+</body>
+</html>

@@ -17,6 +17,8 @@
 
 import { observance } from './calendar.js';
 
+export const LFF_AVAILABLE = true;
+
 /** The Episcopal Church's own PDF of the current edition. */
 export const LFF_URL = 'https://www.episcopalchurch.org/wp-content/uploads/2025/03/lesser_feasts_and_fasts_-_2024__final_.pdf';
 export const LFF_KEY = 'prayer-tracker:lff';

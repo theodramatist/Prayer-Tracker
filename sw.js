@@ -2,8 +2,13 @@
 // and served from the cache afterwards. Bump VERSION (and js/version.js) on
 // every release so phones pick up the new files.
 
-const VERSION = '2.7.1';
+const VERSION = '2.8.0';
 const CACHE = `prayer-tracker-${VERSION}`;
+// This copy's own caches, and not the public edition's (prayer-tracker-public-…),
+// which can live at the same web address.
+const OWN_CACHE = /^prayer-tracker-\d/;
+// The public edition lives in its own folder, with its own service worker.
+const ELSEWHERE = new URL('./everyone/', self.location).pathname;
 
 const ASSETS = [
   './',
@@ -15,6 +20,8 @@ const ASSETS = [
   './js/calendar.js',
   './js/collects.js',
   './js/dates.js',
+  './js/edition.js',
+  './js/extras.js',
   './js/importer.js',
   './js/lff.js',
   './js/lists.js',
@@ -27,6 +34,7 @@ const ASSETS = [
   './js/seeds.js',
   './js/settings.js',
   './js/share.js',
+  './js/share-ui.js',
   './js/sheets.js',
   './js/store.js',
   './js/sync.js',
@@ -62,7 +70,7 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
     for (const key of await caches.keys()) {
-      if (key.startsWith('prayer-tracker-') && key !== CACHE) await caches.delete(key);
+      if (OWN_CACHE.test(key) && key !== CACHE) await caches.delete(key);
     }
     await self.clients.claim();
   })());
@@ -73,6 +81,7 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
+  if (url.pathname.startsWith(ELSEWHERE)) return;
 
   event.respondWith((async () => {
     const cache = await caches.open(CACHE);
