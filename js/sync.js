@@ -7,6 +7,8 @@ import { SCHEMA, migrate, syncDocument, keepTombstone } from './store.js';
 import { addDays, todayKey } from './dates.js';
 
 const CONFIG_KEY = 'prayer-tracker:sync';
+/** Lesser Feasts and Fasts goes in a file of its own, written once each time it's loaded. */
+export const LFF_FILE = 'lesser-feasts-and-fasts.json';
 const API = 'https://api.github.com';
 
 const at = (x) => Number(x?.updated) || 0;
@@ -94,12 +96,19 @@ export function mergeStates(a, b, { now = Date.now() } = {}) {
   const keptTombstones = {};
   for (const [id, t] of Object.entries(tombstones)) if (t >= now - TOMBSTONE_DAYS * 864e5 || keepTombstone(id)) keptTombstones[id] = t;
 
+  // Which copy of each book is current: the one loaded (or removed) last.
+  const library = {};
+  for (const key of new Set([...Object.keys(a.library || {}), ...Object.keys(b.library || {})])) {
+    library[key] = newer(a.library?.[key], b.library?.[key]);
+  }
+
   return {
     schema: SCHEMA,
     lists,
     checks,
     tombstones: keptTombstones,
     settings: newer(a.settings, b.settings) || {},
+    library,
     orderUpdated: Math.max(a.orderUpdated || 0, b.orderUpdated || 0),
   };
 }
@@ -233,8 +242,9 @@ function saveSyncConfig(config, storage = globalThis.localStorage) {
 }
 
 export class SyncManager {
-  constructor(store, { fetchImpl, storage = globalThis.localStorage } = {}) {
+  constructor(store, { fetchImpl, storage = globalThis.localStorage, library = null } = {}) {
     this.store = store;
+    this.library = library;
     this.fetchImpl = fetchImpl;
     this.storage = storage;
     this.config = loadSyncConfig(storage);
@@ -329,6 +339,8 @@ export class SyncManager {
           this.applying = true;
           try { this.store.applySynced(merged); } finally { this.applying = false; }
         }
+        // Before the main file says a new copy of a book is current, put it in the repository.
+        await this.syncLibrary(remoteDoc);
         if (remoteDoc && sameDoc(this.store.syncDocument(), remoteDoc)) break;
         try {
           await file.write(this.store.syncDocument(), remote?.sha);
@@ -344,5 +356,32 @@ export class SyncManager {
     } catch (e) {
       this.setStatus({ state: 'error', message: e.message || 'Sync failed.', auth: !!e.auth, at: this.config?.lastSync || null });
     }
+  }
+
+  /**
+   * Lesser Feasts and Fasts, kept on this device apart from the lists (see
+   * lff.js), goes back and forth in its own file, so the main file stays
+   * small: the main file only says which copy is current. The device that
+   * loaded the current copy writes it; the others fetch it once.
+   */
+  async syncLibrary(remoteDoc) {
+    const lib = this.library;
+    if (!lib) return;
+    const current = this.store.state.library?.lff || null;
+    if (!current) return;
+    if (current.removed) {
+      if (lib.data) lib.clear();
+      return;
+    }
+    const file = this.file({ ...this.config, path: LFF_FILE });
+    if (lib.data?.updated === current.updated) {
+      if (remoteDoc?.library?.lff?.updated === current.updated) return; // already there
+      const there = await file.read();
+      if (there?.data?.updated === current.updated) return;
+      await file.write(lib.data, there?.sha);
+      return;
+    }
+    const there = await file.read();
+    if (there?.data?.updated === current.updated && Array.isArray(there.data.feasts)) lib.save(there.data);
   }
 }

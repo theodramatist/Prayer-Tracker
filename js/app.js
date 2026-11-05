@@ -5,6 +5,7 @@ import { Store, STORAGE_KEY } from './store.js';
 import { todayKey, addDays, isValidKey } from './dates.js';
 import { dayTitle } from './calendar.js';
 import { SyncManager } from './sync.js';
+import { LffLibrary } from './lff.js';
 import { trackVisualViewport, toast, closeAllSheets } from './ui.js';
 import { renderToday } from './today.js';
 import { renderLists, renderListDetail } from './lists.js';
@@ -19,7 +20,8 @@ const view = document.getElementById('view');
 
 const store = new Store();
 for (const seed of SEEDS) store.seed(seed); // first run on this device: the diocese's cycles
-const sync = new SyncManager(store);
+const lff = new LffLibrary(store.storage);
+const sync = new SyncManager(store, { library: lff });
 
 const ua = navigator.userAgent;
 const platform = {
@@ -39,6 +41,7 @@ function writeUi(patch) {
 const app = {
   store,
   sync,
+  lff,
   platform,
   today: todayKey(),
   viewDate: todayKey(),
@@ -65,6 +68,22 @@ const app = {
   navigate(hash) {
     if (location.hash === hash) render();
     else location.hash = hash;
+  },
+  /**
+   * Keep a copy of Lesser Feasts and Fasts as read from its PDF (or a backup),
+   * or remove it (null), here and, through sync, on your other devices.
+   */
+  setLff(book) {
+    const updated = store.stamp();
+    if (!book) {
+      lff.clear();
+      store.setLibrary('lff', { removed: true, updated });
+      return true;
+    }
+    const data = { edition: book.edition, title: book.title, feasts: book.feasts, updated };
+    if (!lff.save(data)) return false;
+    store.setLibrary('lff', { edition: data.edition, title: data.title, count: data.feasts.length, updated });
+    return true;
   },
 };
 

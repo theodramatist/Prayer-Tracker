@@ -10,6 +10,7 @@ import { formatDate, formatLong, formatMedium, formatWithYear, diffDays } from '
 import { dayTitle } from './calendar.js';
 import { prayersFor, itemPrayer, isPrayerItem, firstWords, DEFAULT_RITE } from './prayers.js';
 import { collectFor, collectSource } from './collects.js';
+import { keptFeasts, feastCollect, feastSource } from './lff.js';
 import { openAddSheet, openItemSheet, openImportSheet, openPrayerPicker, loadSeed, ACP_URL } from './sheets.js';
 import { seedFor } from './seeds.js';
 import { openPrayThrough } from './praythrough.js';
@@ -129,9 +130,19 @@ export function renderToday(app) {
   ];
 }
 
+/** The day's title: its observance or, failing that, a lesser feast kept on it, or the season. */
+function dayLine(app, date) {
+  const day = dayTitle(date);
+  if (day.feast) return day;
+  const [f, ...others] = keptFeasts(app.lff, app.store.state.settings, date);
+  if (!f) return day;
+  const detail = [f.sub, ...others.map((o) => `and ${o.title}`)].filter(Boolean).join(' · ');
+  return { ...day, title: f.title, detail: detail || null, lesser: true };
+}
+
 function dayHeader(app, date) {
   const isToday = date === app.today;
-  const day = dayTitle(date);
+  const day = dayLine(app, date);
   const picker = h('input', {
     type: 'date',
     class: 'date-overlay',
@@ -147,7 +158,7 @@ function dayHeader(app, date) {
     h('div', { class: 'day-title' },
       h('p', { class: `day-rel ${isToday ? '' : 'away'}` }, relativeDay(date, app.today)),
       titleFor(date),
-      h('p', { class: `feast ${day.feast ? 'is-feast' : ''}` }, day.title),
+      h('p', { class: `feast ${day.feast ? 'is-feast' : ''} ${day.lesser ? 'is-lesser' : ''}` }, day.title),
       day.detail && h('p', { class: 'feast-detail' }, day.detail),
       picker),
     h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Next day', onclick: () => app.shiftDay(1) }, icon('right')),
@@ -212,14 +223,22 @@ function foldedPrayer(app, key, title, text, ...after) {
   return el;
 }
 
-/** The Collect of the Day, in the language chosen in Settings, with where to find it. */
+/**
+ * The Collect of the Day, in the language chosen in Settings, with where to
+ * find it. On a lesser feast it is the feast's, and the Prayer Book's (the
+ * Sunday's, as a rule) comes after it as the other choice.
+ */
 function collectBlock(app, date) {
   const { settings } = app.store.state;
   if (settings.showCollect === false) return null;
-  const c = collectFor(date, settings.rite || DEFAULT_RITE);
+  const rite = settings.rite || DEFAULT_RITE;
+  const c = collectFor(date, rite);
   if (!c) return null;
-  return h('section', { class: 'collect-day', 'aria-label': 'The Collect of the Day', 'data-collect': c.id },
-    foldedPrayer(app, 'collect', 'The Collect of the Day', c.text, h('p', { class: 'collect-source' }, collectSource(c))));
+  const feasts = keptFeasts(app.lff, settings, date).map((f) => feastCollect(f, rite, app.lff));
+  const source = (x) => h('p', { class: 'collect-source' }, x.book ? feastSource(x) : collectSource(x));
+  const all = [...feasts, c];
+  return h('section', { class: 'collect-day', 'aria-label': 'The Collect of the Day', 'data-collect': all[0].id },
+    all.map((x, k) => foldedPrayer(app, k ? `collect:${x.id}` : 'collect', k ? `Or: ${x.title}` : 'The Collect of the Day', x.text, source(x))));
 }
 
 /** The prayers a list opens with, each folded until tapped. */

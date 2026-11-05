@@ -517,6 +517,7 @@ code { font: 0.92em/1 ui-monospace, "SF Mono", Menlo, monospace; padding: 1px 5p
 /* The Collect of the Day, folded like a list's prayer, ahead of the lists. */
 .collect-day { margin-top: 20px; }
 .collect-day .prayer { margin: 0 4px; }
+.collect-day .prayer + .prayer { margin-top: 14px; }
 .collect-source, .pray-source { color: var(--text-3); font-size: 13px; line-height: 1.4; }
 .collect-source { margin-top: 8px; }
 .pray-source { margin-top: 16px; }
@@ -1125,7 +1126,8 @@ input[type="date"].input { -webkit-appearance: none; appearance: none; min-width
 .button-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .install-here { padding: 8px 10px; border-radius: var(--radius-sm); background: var(--accent-soft); }
 .steps { margin: 10px 0 4px; padding-left: 22px; color: var(--text-2); font-size: 15px; display: grid; gap: 6px; }
-.sync-status.is-error { color: var(--danger); }
+.sync-status.is-error, .lff-status.is-error { color: var(--danger); }
+.lff-status:empty { display: none; }
 .noscript { padding: 24px; text-align: center; }
 
 /* ---------- pray-through ---------- */

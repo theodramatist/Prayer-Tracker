@@ -7,6 +7,7 @@ import { dayModel, pendingEntries } from './today.js';
 import { prayersFor, itemPrayer, isPrayerItem, DEFAULT_RITE } from './prayers.js';
 import { formatMedium } from './dates.js';
 import { collectFor, collectSource } from './collects.js';
+import { keptFeasts, feastCollect, feastSource } from './lff.js';
 
 export function openPrayThrough(app) {
   const { store } = app;
@@ -14,7 +15,9 @@ export function openPrayThrough(app) {
   const withPrayers = store.state.settings.showPrayers !== false;
   const rite = store.state.settings.rite || DEFAULT_RITE;
   const cards = [];
-  const collect = store.state.settings.showCollect !== false && collectFor(model.date, rite);
+  // On a lesser feast, its collect; otherwise the Prayer Book's.
+  const [feast] = keptFeasts(app.lff, store.state.settings, model.date);
+  const collect = store.state.settings.showCollect !== false && (feast ? feastCollect(feast, rite, app.lff) : collectFor(model.date, rite));
   if (collect) cards.push({ kind: 'collect', collect });
   for (const { group, entries } of pendingEntries(model)) {
     if (withPrayers) for (const prayer of prayersFor(group.list, rite)) cards.push({ kind: 'prayer', group, prayer });
@@ -49,7 +52,7 @@ export function openPrayThrough(app) {
         h('p', { class: 'pray-eyebrow' }, 'The Collect of the Day'),
         h('h2', { class: 'pray-prayer-title' }, card.collect.title),
         prayerBody(card.collect.text, 'pray-prayer-text'),
-        h('p', { class: 'pray-source' }, collectSource({ ...card.collect, title: null })));
+        h('p', { class: 'pray-source' }, card.collect.book ? feastSource({ ...card.collect, line: card.collect.sub }) : collectSource({ ...card.collect, title: null })));
     } else if (card.kind === 'prayer') {
       body = h('div', { class: 'pray-card pray-prayer' },
         h('p', { class: 'pray-eyebrow' }, eyebrow(card.group)),

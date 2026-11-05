@@ -32,7 +32,22 @@ You can rename, reorder, hide or delete any of these, and make more lists of any
   it is the numbered Proper closest to their date (page 158). Christmas Day, Easter Day,
   Ascension Day and Pentecost give each of their collects, with "or this" between them.
   Pray-through opens with it. To hide it, turn off **Settings → Prayers → Show the Collect
-  of the Day**. The lesser feasts (Lesser Feasts and Fasts) aren't in it yet.
+  of the Day**.
+- **Lesser Feasts and Fasts:** Settings → Lesser Feasts and Fasts → **Choose the PDF**, with
+  your own copy of *Lesser Feasts and Fasts 2024* (the Episcopal Church publishes it free;
+  the card links to it). The app reads it on the device in a few seconds and keeps its 247
+  lesser feasts, each with its collect in Rite One and Rite Two exactly as printed. On a day
+  with no observance of the Prayer Book's own, a lesser feast names the day on Today, and
+  its collect is the Collect of the Day, with the Prayer Book's (the Sunday's, as a rule)
+  after it as the other choice; on the two days with a second commemoration for trial use,
+  that one is offered too. As the Calendar's rules have it ("subject to the rules of
+  precedence governing Principal Feasts, Sundays, and Holy Days", BCP page 18), a lesser feast
+  gives way to a Sunday, a Principal Feast or a Holy Day (including one moved onto its day),
+  Ash Wednesday, and the days of Holy Week and Easter Week; nothing provides for moving a
+  lesser feast, so when it is displaced it isn't kept that year. **Keep the lesser feasts**
+  turns them off and on. The book is under copyright, so it isn't part of the app: it stays
+  on your devices, goes in your backups, and with sync on travels to your other devices in
+  a file of its own in your private repository, written once each time you load it.
 - Tap the circle to mark someone prayed for, and they slide away. Undo is on the message
   at the bottom, and **Show prayed** brings checked entries back.
 - **Morning Prayer** comes first on Today: each list you read at the office, as that
@@ -235,7 +250,8 @@ opening the app and tapping **+**. On Android, use the shortcut and Share option
 
 **Settings → Sync across devices** keeps the same lists on your phone, iPad and
 computer. They're stored as one file, `prayer-tracker.json`, in a **private** GitHub
-repository you own (keep it separate from this one, which may be public):
+repository you own (keep it separate from this one, which may be public), with
+Lesser Feasts and Fasts, if you've loaded it, beside it in `lesser-feasts-and-fasts.json`:
 
 1. Create a new private repository, for example `prayer-data`.
 2. Make a [fine-grained access token](https://github.com/settings/personal-access-tokens/new):
@@ -277,6 +293,10 @@ Layout: `index.html`, `css/app.css`, and ES modules in `js/`:
 - `calendar.js` holds the BCP 1979 calendar (feasts, named Sundays, Propers, transfers),
   with the Prayer Book's own titles (pages 31–33), checked against its calendar and
   collects, and which collect each day takes; `liturgy.js` works out seasons and Easter.
+- `lff.js` reads Lesser Feasts and Fasts from the PDF you choose (the Calendar, then each
+  Proper's date, heading and collects) and applies the rules of precedence; the book's
+  text is kept on the device, never in this repository. The tests use an invented stand-in
+  laid out the same way.
 - `collects.js` gives the Collect of the Day from `data/collects.js`: the Prayer Book's
   Collects for the Seasons of the Year and the Holy Days, traditional and contemporary,
   exactly as printed, built from its two PDFs by

@@ -2,7 +2,7 @@
 // and served from the cache afterwards. Bump VERSION (and js/version.js) on
 // every release so phones pick up the new files.
 
-const VERSION = '2.6.0';
+const VERSION = '2.7.0';
 const CACHE = `prayer-tracker-${VERSION}`;
 
 const ASSETS = [
@@ -16,6 +16,7 @@ const ASSETS = [
   './js/collects.js',
   './js/dates.js',
   './js/importer.js',
+  './js/lff.js',
   './js/lists.js',
   './js/liturgy.js',
   './js/names.js',

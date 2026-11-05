@@ -68,6 +68,9 @@ export function defaultState(now = Date.now(), today = todayKey()) {
     checks: {},
     tombstones: {},
     settings: { palette: 'burgundy', foldShortMonths: true, theme: 'auto', showPrayers: true, showCollect: true, rite: 'contemporary', updated: 0 },
+    // Books loaded from your own copies (see lff.js): only which copy is
+    // current is kept here; the book itself is stored apart.
+    library: {},
     orderUpdated: 0,
     meta: { created: now, lastBackup: null, quickAddList: 'requests', durations: {} },
   };
@@ -112,6 +115,7 @@ export function migrate(data, now = Date.now(), today = todayKey()) {
     checks: data.checks && typeof data.checks === 'object' ? data.checks : {},
     tombstones: data.tombstones && typeof data.tombstones === 'object' ? data.tombstones : {},
     settings: { ...base.settings, ...(data.settings || {}) },
+    library: data.library && typeof data.library === 'object' ? data.library : {},
     orderUpdated: Number(data.orderUpdated) || 0,
     meta: { ...base.meta, ...(data.meta || {}) },
   };
@@ -119,8 +123,8 @@ export function migrate(data, now = Date.now(), today = todayKey()) {
 
 /** The part of the state that is shared between devices. */
 export function syncDocument(state) {
-  const { schema, lists, checks, tombstones, settings, orderUpdated } = state;
-  return JSON.parse(JSON.stringify({ schema, lists, checks, tombstones, settings, orderUpdated }));
+  const { schema, lists, checks, tombstones, settings, library = {}, orderUpdated } = state;
+  return JSON.parse(JSON.stringify({ schema, lists, checks, tombstones, settings, library, orderUpdated }));
 }
 
 /**
@@ -656,6 +660,13 @@ export class Store {
     this.commit((s) => {
       s.settings[key] = value;
       s.settings.updated = this.stamp();
+    });
+  }
+
+  /** Which copy of a book (such as Lesser Feasts and Fasts) is current: { edition, title, count, updated } or { removed, updated }. */
+  setLibrary(key, entry) {
+    this.commit((s) => {
+      s.library = { ...(s.library || {}), [key]: entry };
     });
   }
 

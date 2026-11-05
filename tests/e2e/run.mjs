@@ -615,8 +615,9 @@ const FAKE_ACP = `export default { id: 'acptest', title: 'Test cycle', source: '
 ${NAMES.map((n) => `  { text: 'The Diocese of ${n} (Example)', note: 'The Rt Revd ${n} Bishop' },`).join('\n')}
 ] };`;
 
-const gh = { file: null, version: 0 };
+const gh = { file: null, version: 0, others: {} };
 const ghDoc = () => JSON.parse(Buffer.from(gh.file, 'base64').toString('utf8'));
+const ghOther = (path) => gh.others[path] && JSON.parse(Buffer.from(gh.others[path].content, 'base64').toString('utf8'));
 const context2 = await browser.newContext({
   viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true,
   locale: 'en-US', timezoneId: 'America/New_York', serviceWorkers: 'block',
@@ -644,6 +645,17 @@ await context2.route('https://api.github.com/**', async (route) => {
   if (req.headers().authorization !== 'Bearer good-token') return json(401, { message: 'Bad credentials' });
   const path = new URL(req.url()).pathname;
   if (path === '/repos/me/prayer-data') return json(200, { private: true, full_name: 'me/prayer-data' });
+  // Any other file in the repository (Lesser Feasts and Fasts has one of its own).
+  const other = path.match(/^\/repos\/me\/prayer-data\/contents\/(.+)$/)?.[1];
+  if (other && other !== 'prayer-tracker.json') {
+    const f = gh.others[other];
+    if (req.method() === 'GET') return f ? json(200, { sha: f.sha, encoding: 'base64', content: f.content }) : json(404, { message: 'Not Found' });
+    const body = JSON.parse(req.postData());
+    if (f && body.sha !== f.sha) return json(409, { message: 'does not match' });
+    const sha = `o${(f ? Number(f.sha.slice(1)) : 0) + 1}`; // its own versions, apart from the main file's
+    gh.others[other] = { sha, content: body.content };
+    return json(200, { content: { sha } });
+  }
   if (path !== '/repos/me/prayer-data/contents/prayer-tracker.json') return json(404, { message: 'Not Found' });
   if (req.method() === 'GET') return gh.file ? json(200, { sha: `s${gh.version}`, encoding: 'base64', content: gh.file }) : json(404, { message: 'Not Found' });
   const body = JSON.parse(req.postData());
@@ -1059,6 +1071,83 @@ await step('your chosen prayers are said one by one in pray-through, and checked
   await page.click('a[href="#/settings"]');
   await page.locator('.chips-rite .chip', { hasText: 'Rite Two' }).click();
   await goToday();
+});
+
+await step('Lesser Feasts and Fasts: your own copy of the PDF is read on the device; a lesser feast names the day and gives the Collect of the Day', async () => {
+  // A stand-in for the book, laid out as it is (its text is under copyright): the title,
+  // the Calendar, then each Proper on a page of its own, with its date at the foot.
+  const pt = (size, text) => `<p style="font-size:${size}pt">${text}</p>`;
+  const sheet = (body, foot = '') => `<section>${body}${foot ? `<p class="foot" style="font-size:11pt">${foot}</p>` : ''}</section>`;
+  const proper = (pageNo, date, heading, sub, who) => [
+    sheet(pt(9, `The life of ${who}, in small type.`), `${pageNo - 1} ${date}`),
+    sheet([pt(17, heading), pt(9, sub),
+      pt(11, `I Almighty God, who didst give thy servant ${who} grace to serve`), pt(11, 'thee: Grant us the same; through Jesus Christ our Lord.'), pt(11, 'Amen.'),
+      pt(11, `II Almighty God, you gave your servant ${who} grace to serve`), pt(11, 'you: Grant us the same; through Jesus Christ our Lord. Amen.'),
+      pt(9, 'Lessons and Psalm'), pt(9, 'Psalm 1'), pt(11, 'Preface of a Saint (1)')].join(''), `${pageNo}${date}`),
+  ].join('');
+  const html = `<style>@page{size:5.5in 8.5in;margin:0} body{margin:0;font-family:Georgia} section{position:relative;height:8.5in;padding:0.6in;box-sizing:border-box;page-break-after:always}
+    p{margin:0 0 4pt;line-height:1.15} .foot{position:absolute;bottom:0.85in;left:0.6in}</style>
+    ${sheet(pt(38, 'Lesser Feasts') + pt(38, 'and Fasts • 2024'))}
+    ${sheet(pt(12, 'November') + pt(10, '1 All Saints') + pt(10, '3 Ann Example, Teacher, 1900') + pt(10, '4 Hal Example, Priest, 1700'), '17The Calendar of the Church Year')}
+    ${sheet(pt(38, 'The Proper for') + pt(38, 'the Lesser Feasts'))}
+    ${proper(25, 'November 3', 'Ann Example', 'Teacher, 1900', 'Ann')}
+    ${proper(27, 'November 4', 'Hal Example', 'Priest, 1700', 'Hal')}
+    ${sheet(pt(38, 'The Commons'))}`;
+  const pdfPage = await context2.newPage();
+  await pdfPage.setContent(html);
+  const pdfPath = `${OUT}lff-sample.pdf`;
+  await pdfPage.pdf({ path: pdfPath, width: '5.5in', height: '8.5in', printBackground: false });
+  await pdfPage.close();
+
+  await page.click('.tabbar a[href="#/lists"]');
+  await page.click('a[href="#/settings"]');
+  const lffCard = page.locator('.settings-card', { hasText: 'Lesser Feasts and Fasts' });
+  assert.match(await lffCard.innerText(), /Download the PDF from the Episcopal Church/);
+  assert.match(await lffCard.locator('a', { hasText: 'Download the PDF' }).getAttribute('href'), /^https:\/\/www\.episcopalchurch\.org\/.*lesser_feasts_and_fasts.*\.pdf$/);
+  await lffCard.locator('input[type=file]').setInputFiles(pdfPath);
+  await eventually(async () => assert.match(await page.locator('.toast.show').innerText(), /Lesser Feasts and Fasts 2024: 2 lesser feasts added/), 15000);
+  await eventually(async () => assert.match(await page.locator('.settings-card', { hasText: 'Keep the lesser feasts' }).innerText(), /Lesser Feasts and Fasts 2024: 2 lesser feasts/));
+  await shot('36-settings-lff');
+
+  // Tuesday, November 3: Ann Example, whose collect is the Collect of the Day, with the Prayer Book's after it.
+  await goToday();
+  assert.equal(await page.locator('.feast').innerText(), 'Ann Example');
+  assert.equal(await page.locator('.feast-detail').innerText(), 'TEACHER, 1900');
+  const c = page.locator('.collect-day');
+  assert.equal(await c.getAttribute('data-collect'), 'lff-11-03');
+  assert.deepEqual(await texts('.collect-day .prayer-title'), ['THE COLLECT OF THE DAY', 'OR: PROPER 26']);
+  assert.match(await c.locator('.prayer-first').first().innerText(), /^Almighty God, you gave your servant Ann grace to serve you/);
+  await c.locator('summary').first().click();
+  assert.equal(await c.locator('.collect-source').first().innerText(), 'Ann Example, Teacher, 1900 · Lesser Feasts and Fasts 2024, page 25');
+  await shot('37-today-lesser-feast');
+  await c.locator('summary').first().click();
+  // A lesser feast gives way to a Sunday, and isn't moved: November 8 is the Twenty-Fourth Sunday after Pentecost.
+  await page.evaluate(() => window.prayerTracker.setDate('2026-11-04'));
+  assert.equal(await page.locator('.feast').innerText(), 'Hal Example');
+  await page.evaluate(() => window.prayerTracker.setDate('2026-11-03'));
+
+  // It goes to the repository in a file of its own; the main file only says which copy is current.
+  await eventually(async () => assert.equal(ghOther('lesser-feasts-and-fasts.json')?.feasts.length, 2), 8000);
+  await eventually(async () => assert.equal(ghDoc().library?.lff?.count, 2), 8000);
+  assert.equal(ghDoc().library.lff.feasts, undefined);
+
+  // Turned off, the day is the season's again, with the Prayer Book's collect.
+  await page.click('.tabbar a[href="#/lists"]');
+  await page.click('a[href="#/settings"]');
+  await page.locator('.toggle-row', { hasText: 'Keep the lesser feasts' }).locator('.toggle-text').click();
+  await goToday();
+  assert.equal(await page.locator('.feast').innerText(), 'The Season after Pentecost');
+  assert.equal(await page.locator('.collect-day').getAttribute('data-collect'), 'proper-26');
+  await page.click('.tabbar a[href="#/lists"]');
+  await page.click('a[href="#/settings"]');
+  await page.locator('.toggle-row', { hasText: 'Keep the lesser feasts' }).locator('.toggle-text').click();
+  // And removed, here and on the other devices.
+  await page.locator('.settings-card', { hasText: 'Keep the lesser feasts' }).locator('button', { hasText: 'Remove' }).click();
+  await page.locator('.sheet-confirm .btn-primary').click();
+  await eventually(async () => assert.equal(ghDoc().library?.lff?.removed, true), 8000);
+  assert.match(await page.locator('.settings-card', { hasText: 'Lesser Feasts and Fasts' }).innerText(), /Choose the PDF/);
+  await goToday();
+  assert.equal(await page.locator('.feast').innerText(), 'The Season after Pentecost');
 });
 
 await step('colours: burgundy on ivory unless blue or the church year is chosen', async () => {
