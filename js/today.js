@@ -9,7 +9,7 @@ import { agenda, carriedOver, endLabel, entryCount, officeFor } from './schedule
 import { formatDate, formatLong, formatMedium, formatWithYear, diffDays } from './dates.js';
 import { dayTitle } from './calendar.js';
 import { prayersFor, itemPrayer, isPrayerItem, firstWords, DEFAULT_RITE } from './prayers.js';
-import { collectFor, collectSource } from './collects.js';
+import { collectChoices, collectSource } from './collects.js';
 import { keptFeasts, feastCollect, feastSource } from './lff.js';
 import { openAddSheet, openItemSheet, openImportSheet, openPrayerPicker, loadSeed, ACP_URL } from './sheets.js';
 import { seedFor } from './seeds.js';
@@ -232,11 +232,11 @@ function collectBlock(app, date) {
   const { settings } = app.store.state;
   if (settings.showCollect === false) return null;
   const rite = settings.rite || DEFAULT_RITE;
-  const c = collectFor(date, rite);
-  if (!c) return null;
+  const choices = collectChoices(date, rite);
+  if (!choices.length) return null;
   const feasts = keptFeasts(app.lff, settings, date).map((f) => feastCollect(f, rite, app.lff));
   const source = (x) => h('p', { class: 'collect-source' }, x.book ? feastSource(x) : collectSource(x));
-  const all = [...feasts, c];
+  const all = [...feasts, ...choices];
   return h('section', { class: 'collect-day', 'aria-label': 'The Collect of the Day', 'data-collect': all[0].id },
     all.map((x, k) => foldedPrayer(app, k ? `collect:${x.id}` : 'collect', k ? `Or: ${x.title}` : 'The Collect of the Day', x.text, source(x))));
 }

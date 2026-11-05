@@ -207,6 +207,36 @@ export function dayTitle(dateKey) {
 }
 
 /**
+ * Other collects the Calendar allows on a Sunday, in place of the Sunday's:
+ * All Saints' Day's on the Sunday after November 1 ("All Saints' Day may
+ * always be observed on the Sunday following November 1"), and that of a
+ * Major Feast which falls on the Sunday and so is moved to the week ("When
+ * desired, however, the Collect ... appointed for the Feast may be
+ * substituted for those of the Sunday, but not from the Last Sunday after
+ * Pentecost through the First Sunday after the Epiphany, or from the Last
+ * Sunday after the Epiphany through Trinity Sunday", page 16).
+ */
+export function sundayAlternatives(dateKey) {
+  if (weekday(dateKey) !== 0 || observance(dateKey)?.rank !== 'sunday') return [];
+  const { y } = parseKey(dateKey);
+  const out = [];
+  const nov1 = keyFromParts(y, 11, 1);
+  if (dateKey > nov1 && diffDays(nov1, dateKey) < 7) out.push('all-saints-day');
+  const ez = easter(y);
+  const jan6 = keyFromParts(y, 1, 6);
+  const firstAfterEpiphany = addDays(jan6, 7 - weekday(jan6));
+  const lastAfterEpiphany = addDays(ez, -49);
+  const trinity = addDays(ez, 56);
+  const lastAfterPentecost = addDays(adventSunday(y), -7);
+  const allowed = (dateKey > firstAfterEpiphany && dateKey < lastAfterEpiphany) || (dateKey > trinity && dateKey < lastAfterPentecost);
+  if (allowed) {
+    const md = dateKey.slice(5);
+    if (HOLY_DAYS.some(([d, , , opts = {}]) => d === md && !opts.lord)) out.push(md);
+  }
+  return out;
+}
+
+/**
  * The id of the Collect for a date: the day's own, if it has one; otherwise,
  * on a weekday, the one the Prayer Book appoints. That is the Sunday's (page
  * 158: "The Proper appointed for the Sunday is also used ... on the weekdays

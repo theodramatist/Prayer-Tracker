@@ -31,6 +31,12 @@ You can rename, reorder, hide or delete any of these, and make more lists of any
   Ascension Day's for the days after them; in the weeks of Pentecost and Trinity Sunday
   it is the numbered Proper closest to their date (page 158). Christmas Day, Easter Day,
   Ascension Day and Pentecost give each of their collects, with "or this" between them.
+  On the Sunday after November 1, All Saints' Day's is offered too ("All Saints' Day may
+  always be observed on the Sunday following November 1"), and so is a Holy Day's that
+  falls on a Sunday and moves to the week, as the Calendar allows ("the Collect ... may be
+  substituted for those of the Sunday", page 16), except from the Last Sunday after
+  Pentecost through the First Sunday after the Epiphany and from the Last Sunday after the
+  Epiphany through Trinity Sunday.
   Pray-through opens with it. To hide it, turn off **Settings → Prayers → Show the Collect
   of the Day**.
 - **Lesser Feasts and Fasts:** Settings → Lesser Feasts and Fasts → **Choose the PDF**, with

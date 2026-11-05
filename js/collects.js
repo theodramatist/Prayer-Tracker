@@ -4,7 +4,7 @@
 // included, is worked out in calendar.js.
 
 import data from './data/collects.js';
-import { collectId } from './calendar.js';
+import { collectId, sundayAlternatives } from './calendar.js';
 import { DEFAULT_RITE } from './prayers.js';
 
 /** Every collect by id: "advent-1", "proper-26", "christmas-day", or a Holy Day's date ("11-30"). */
@@ -21,6 +21,19 @@ export function collectFor(dateKey, rite = DEFAULT_RITE) {
   if (!c) return null;
   const r = rite === 'traditional' ? 'traditional' : 'contemporary';
   return { id: c.id, title: c.title, sub: c.sub || null, text: c[r], page: c.pages[r] };
+}
+
+/**
+ * The collect for a date and the others the Calendar allows in its place (on
+ * some Sundays, All Saints' Day's or a moved Holy Day's), first the day's own.
+ */
+export function collectChoices(dateKey, rite = DEFAULT_RITE) {
+  const own = collectFor(dateKey, rite);
+  if (!own) return [];
+  const r = rite === 'traditional' ? 'traditional' : 'contemporary';
+  const others = sundayAlternatives(dateKey).map((id) => COLLECTS[id]).filter(Boolean)
+    .map((c) => ({ id: c.id, title: c.title, sub: c.sub || null, text: c[r], page: c.pages[r] }));
+  return [own, ...others];
 }
 
 /** Where to find it in the Prayer Book: its heading and page. */

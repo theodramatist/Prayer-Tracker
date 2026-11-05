@@ -137,3 +137,29 @@ test('every day has a collect, and every collect in the book comes up', () => {
   }
   assert.deepEqual(Object.keys(COLLECTS).filter((x) => !used.has(x)), []);
 });
+
+test('on some Sundays the Calendar allows another collect: All Saints’ Day’s, or a Holy Day’s that moves off the Sunday', async () => {
+  const { collectChoices } = await import('../../js/collects.js');
+  const ids = (k) => collectChoices(k).map((c) => c.id);
+  // "All Saints' Day may always be observed on the Sunday following November 1."
+  assert.deepEqual(ids('2027-11-07'), ['proper-27', 'all-saints-day']);
+  assert.deepEqual(ids('2026-11-01'), ['all-saints-day']); // the day itself
+  // A Major Feast on a Sunday is kept in the week, but its collect "may be substituted for those of the Sunday"...
+  assert.deepEqual(ids('2026-10-18'), ['proper-24', '10-18']);
+  assert.deepEqual(ids('2026-01-18'), ['epiphany-2', '01-18']);
+  assert.deepEqual(ids('2027-07-04'), ['proper-9', '07-04']);
+  // ...but not from the Last Sunday after Pentecost through the First Sunday after the Epiphany,
+  assert.deepEqual(ids('2025-11-30'), ['advent-1']);
+  assert.deepEqual(ids('2025-12-21'), ['advent-4']);
+  assert.deepEqual(ids('2024-12-29'), ['christmas-1']); // Holy Innocents' Day's date
+  // or from the Last Sunday after the Epiphany through Trinity Sunday.
+  assert.deepEqual(ids('2029-02-11'), ['epiphany-last']);
+  assert.deepEqual(ids('2029-02-24').length, 1); // a Saturday in Lent: no choices on weekdays
+  assert.deepEqual(ids('2008-02-24'), ['lent-3']); // Saint Matthias's date, a Sunday in Lent
+  assert.deepEqual(ids('2030-02-24'), ['epiphany-7', '02-24']); // the same date before Lent
+  assert.deepEqual(ids('2026-05-31'), ['trinity-sunday']); // the Visitation gives way to Trinity Sunday
+  // The Holy Name, the Presentation and the Transfiguration take the Sunday themselves.
+  assert.deepEqual(ids('2028-08-06'), ['08-06']);
+  // Weekdays have one.
+  assert.deepEqual(ids('2026-11-04'), ['proper-26']);
+});
