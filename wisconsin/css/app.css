@@ -89,6 +89,10 @@
   --tabbar-h: 62px;
   --font-serif: "Fraunces", ui-serif, "Iowan Old Style", Palatino, Georgia, serif;
   --font-sans: "Instrument Sans", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  /* Fraunces at reading sizes (collects, prayers, notes) is set a step lighter
+     than the sans around it, so it reads like a printed page; the small italic
+     lines and buttons beside it are a step lighter too, and headings keep theirs. */
+  --serif-text: 350;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   color-scheme: light;
@@ -351,7 +355,7 @@ code { font: 0.92em/1 ui-monospace, "SF Mono", Menlo, monospace; padding: 1px 5p
 .day-title h1 .wd {
   font-size: 19px;
   line-height: 1.2;
-  font-weight: 460;
+  font-weight: 360;
   font-style: italic;
   color: var(--text-2);
   font-variation-settings: "SOFT" 100, "WONK" 1;
@@ -373,11 +377,12 @@ code { font: 0.92em/1 ui-monospace, "SF Mono", Menlo, monospace; padding: 1px 5p
   font-family: var(--font-serif);
   font-style: italic;
   font-size: 16px;
+  font-weight: var(--serif-text);
   font-variation-settings: "SOFT" 80;
   color: var(--accent);
   text-wrap: balance;
 }
-.feast.is-feast { font-size: 16.5px; font-weight: 520; }
+.feast.is-feast { font-size: 16.5px; font-weight: 420; }
 .feast-detail { margin-top: 3px; color: var(--text-3); font-size: 11px; }
 .date-overlay {
   position: absolute; inset: 0;
@@ -415,7 +420,7 @@ code { font: 0.92em/1 ui-monospace, "SF Mono", Menlo, monospace; padding: 1px 5p
   background: var(--surface);
   font-family: var(--font-serif);
   font-style: italic;
-  font-weight: 520;
+  font-weight: 420;
   font-size: 17px;
   font-variation-settings: "SOFT" 80;
   padding-inline: 20px;
@@ -497,6 +502,7 @@ code { font: 0.92em/1 ui-monospace, "SF Mono", Menlo, monospace; padding: 1px 5p
   font-family: var(--font-serif);
   font-style: italic;
   font-size: 15.5px;
+  font-weight: var(--serif-text);
   color: var(--text-2);
   font-variation-settings: "SOFT" 80;
   overflow: hidden;
@@ -508,6 +514,7 @@ code { font: 0.92em/1 ui-monospace, "SF Mono", Menlo, monospace; padding: 1px 5p
   margin-top: 4px;
   font-family: var(--font-serif);
   font-size: 16.5px;
+  font-weight: var(--serif-text);
   line-height: 1.55;
   color: var(--text);
   font-variation-settings: "SOFT" 60;
@@ -581,6 +588,7 @@ code { font: 0.92em/1 ui-monospace, "SF Mono", Menlo, monospace; padding: 1px 5p
   font-family: var(--font-serif);
   font-style: italic;
   font-size: 15px;
+  font-weight: var(--serif-text);
   color: var(--text-2);
   font-variation-settings: "SOFT" 80;
   white-space: pre-line;
@@ -659,6 +667,7 @@ code { font: 0.92em/1 ui-monospace, "SF Mono", Menlo, monospace; padding: 1px 5p
   font-family: var(--font-serif);
   font-style: italic;
   font-size: 16.5px;
+  font-weight: var(--serif-text);
 }
 .share-open { margin-top: 2px; }
 
@@ -686,7 +695,7 @@ code { font: 0.92em/1 ui-monospace, "SF Mono", Menlo, monospace; padding: 1px 5p
   background: var(--surface);
 }
 .prayer-row-head { display: flex; align-items: center; gap: 8px; }
-.prayer-row-title { flex: 1; min-width: 0; font-family: var(--font-serif); font-size: 16.5px; text-wrap: balance; }
+.prayer-row-title { flex: 1; min-width: 0; font-family: var(--font-serif); font-size: 16.5px; font-weight: var(--serif-text); text-wrap: balance; }
 .prayer-row-tools { display: flex; gap: 2px; }
 .prayer-row-tools .icon-btn { width: 36px; height: 36px; }
 .prayer-row .link-btn { font-size: 14px; }
@@ -709,7 +718,7 @@ code { font: 0.92em/1 ui-monospace, "SF Mono", Menlo, monospace; padding: 1px 5p
   list-style: none;
 }
 .picker-section > summary::-webkit-details-marker { display: none; }
-.picker-heading { font-family: var(--font-serif); font-size: 17px; font-weight: 520; }
+.picker-heading { font-family: var(--font-serif); font-size: 17px; font-weight: 420; }
 .picker-chosen { color: var(--accent); font-size: 13px; font-weight: 650; white-space: nowrap; }
 .picker-list { list-style: none; margin: 0; padding: 0 12px 6px; }
 .picker-row { padding: 8px 0; border-top: 1px solid var(--line); }
@@ -722,6 +731,7 @@ code { font: 0.92em/1 ui-monospace, "SF Mono", Menlo, monospace; padding: 1px 5p
   font-family: var(--font-serif);
   font-style: italic;
   font-size: 14.5px;
+  font-weight: var(--serif-text);
   cursor: pointer;
   list-style: none;
 }
@@ -767,7 +777,7 @@ code { font: 0.92em/1 ui-monospace, "SF Mono", Menlo, monospace; padding: 1px 5p
 .banner-warn { background: var(--warn-bg); border-color: transparent; border-left-color: var(--warn-text); }
 .banner-warn p { color: var(--warn-text); }
 .empty-card { text-align: center; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow); padding: 26px 18px; }
-.empty-title { font-family: var(--font-serif); font-size: 20px; color: var(--text) !important; margin-bottom: 6px; }
+.empty-title { font-family: var(--font-serif); font-size: 20px; font-weight: var(--serif-text); color: var(--text) !important; margin-bottom: 6px; }
 .inline-plus {
   display: inline-grid; place-items: center;
   width: 22px; height: 22px;
@@ -938,7 +948,7 @@ code { font: 0.92em/1 ui-monospace, "SF Mono", Menlo, monospace; padding: 1px 5p
 textarea.input { resize: vertical; }
 .input-lg { font-size: 19px; padding: 13px 14px; }
 textarea.add-text { resize: none; min-height: 56px; }
-.prayer-input { font-family: var(--font-serif); font-size: 16.5px; line-height: 1.5; }
+.prayer-input { font-family: var(--font-serif); font-size: 16.5px; font-weight: var(--serif-text); line-height: 1.5; }
 .prayer-edit { display: grid; gap: 8px; margin-top: 8px; }
 select.input { appearance: none; -webkit-appearance: none; background-image: linear-gradient(45deg, transparent 50%, var(--text-3) 50%), linear-gradient(135deg, var(--text-3) 50%, transparent 50%); background-position: calc(100% - 20px) 50%, calc(100% - 14px) 50%; background-size: 6px 6px; background-repeat: no-repeat; padding-right: 36px; }
 input[type="date"].input { -webkit-appearance: none; appearance: none; min-width: 0; }
@@ -1110,7 +1120,7 @@ input[type="date"].input { -webkit-appearance: none; appearance: none; min-width
 .row-key { flex: none; width: 92px; font-size: 14px; color: var(--text-3); font-variant-numeric: tabular-nums; }
 .row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .row-text { overflow-wrap: anywhere; font-weight: 500; }
-.row-note { font-family: var(--font-serif); font-style: italic; font-size: 14.5px; color: var(--text-2); white-space: pre-line; overflow-wrap: anywhere; }
+.row-note { font-family: var(--font-serif); font-style: italic; font-size: 14.5px; font-weight: var(--serif-text); color: var(--text-2); white-space: pre-line; overflow-wrap: anywhere; }
 .row .badge { margin-top: 0; }
 
 .settings-card {
@@ -1193,6 +1203,7 @@ input[type="date"].input { -webkit-appearance: none; appearance: none; min-width
   font-family: var(--font-serif);
   font-style: italic;
   font-size: 19px;
+  font-weight: var(--serif-text);
   line-height: 1.45;
   color: var(--text-2);
   font-variation-settings: "SOFT" 80;
@@ -1205,6 +1216,7 @@ input[type="date"].input { -webkit-appearance: none; appearance: none; min-width
 .pray-prayer-text {
   font-family: var(--font-serif);
   font-size: 19px;
+  font-weight: var(--serif-text);
   line-height: 1.6;
   text-align: left;
   font-variation-settings: "SOFT" 60;
@@ -1236,7 +1248,7 @@ input[type="date"].input { -webkit-appearance: none; appearance: none; min-width
   font-family: var(--font-serif);
   font-size: 19px;
   font-style: italic;
-  font-weight: 520;
+  font-weight: 420;
   font-variation-settings: "SOFT" 80;
 }
 

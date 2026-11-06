@@ -421,6 +421,7 @@ versions match and that `sw.js` lists every app file.
 
 Type: [Fraunces](https://github.com/undercasetype/Fraunces) for headings and prayers and
 [Instrument Sans](https://github.com/Instrument/instrument-sans) for lists, both under the
-SIL Open Font License and bundled in `fonts/`. PDF reading uses
+SIL Open Font License and bundled in `fonts/`. The prayers, collects and notes are set a step
+lighter than the lists around them (`--serif-text` in `css/app.css`), like a printed page. PDF reading uses
 [pdf.js](https://mozilla.github.io/pdf.js/) 6.4.299 (Apache-2.0), bundled in
 `vendor/pdfjs/` and loaded only when you choose a PDF.

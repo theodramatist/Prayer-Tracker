@@ -1,6 +1,6 @@
 {
   "name": "prayer-tracker",
-  "version": "2.11.0",
+  "version": "2.12.0",
   "private": true,
   "description": "An installable web app for daily intercessions: the Anglican Cycle of Prayer, a monthly diocesan cycle, a weekly parish list and daily prayer requests.",
   "type": "module",
