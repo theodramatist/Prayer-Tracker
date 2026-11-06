@@ -542,6 +542,7 @@ await step('all prayed shows a closing response', async () => {
 
 await step('Lists and Settings screens render', async () => {
   await page.click('.tabbar a[href="#/lists"]');
+  await page.locator('.lc-name').first().waitFor();
   assert.deepEqual(await texts('.lc-name'), ['Anglican Cycle of Prayer', 'Diocesan Cycle', 'Diocesan Daily Cycle', 'Trinity', 'Prayer Requests', 'Family', 'Clergy', 'Prayers and Thanksgivings']);
   await shot('10-lists');
   await page.click('a[href="#/settings"]');
@@ -1373,6 +1374,72 @@ await step('no errors in the console (part 3)', async () => {
   assert.deepEqual(problems3, []);
 });
 await context3.close();
+
+console.log(' Part 4: the Diocese of Wisconsin and Eastern Ridges editions');
+const context4 = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale: 'en-US', timezoneId: 'America/Chicago' });
+page = await context4.newPage();
+await page.clock.setFixedTime(new Date('2026-11-04T09:00:00-06:00')); // a Wednesday
+const problems4 = [];
+page.on('pageerror', (e) => problems4.push(`pageerror: ${e.message}`));
+page.on('console', (m) => { if (m.type() === 'error') problems4.push(`console: ${m.text()}`); });
+
+await step('Wisconsin: the diocese’s monthly and daily cycles are there from the first opening', async () => {
+  await page.goto(`${BASE}wisconsin/`);
+  await page.locator('.day-head h1').waitFor();
+  assert.deepEqual(await page.evaluate(() => window.prayerTracker.store.state.lists.map((l) => l.id)), ['anglican', 'diocese', 'diocese-daily', 'parish', 'requests', 'family', 'prayers']);
+  assert.ok(await page.locator('.group[data-list=diocese] .item-text').count() >= 1); // day 4's churches
+  assert.equal(await page.locator('.group[data-list=diocese-daily] .item-text').count(), 1);
+  assert.equal(await page.locator('.setup-card[data-list=parish] h2').innerText(), 'My Church');
+  assert.equal(await page.locator('.office').count(), 0);
+  await page.click('.tabbar a[href="#/lists"]');
+  await page.click('a[href="#/settings"]');
+  await page.locator('.settings-card h2').first().waitFor();
+  const titles = (await texts('.settings-card h2')).map((t) => t.toLowerCase());
+  assert.ok(titles.includes('lesser feasts and fasts') && !titles.includes('sync across devices') && !titles.includes('sharing with trinity'), `${titles}`);
+  await shot('60-wisconsin-first-run');
+});
+
+await step('Eastern Ridges: the clergy every day, by last name; take your own name off, and it stays off', async () => {
+  await page.goto(`${BASE}eastern-ridges/`);
+  await page.locator('.day-head h1').waitFor();
+  const names = await texts('.group[data-list=clergy] .item-text');
+  assert.equal(names.length, 21);
+  assert.deepEqual(names.slice(0, 5), ['Mary Lynn Adams', 'Brien Beck', 'Nancy Behm', 'James Biegler', 'Dr. Chris Corbin']);
+  assert.equal(names[8], 'Andy Cruz Lillegard');
+  assert.equal(await page.locator('.group[data-list=clergy] h2').innerText(), 'Eastern Ridges Clergy');
+  await shot('61-eastern-ridges-today');
+  // As the instructions say: Lists → Eastern Ridges Clergy → your name → Delete.
+  await page.click('.tabbar a[href="#/lists"]');
+  await page.locator('a', { hasText: 'Eastern Ridges Clergy' }).first().click();
+  await page.locator('h1', { hasText: 'Eastern Ridges Clergy' }).waitFor();
+  await page.locator('button.row', { hasText: 'Dr. Chris Corbin' }).click();
+  const sheet = page.locator('.sheet-item');
+  await sheet.waitFor();
+  await sheet.locator('button', { hasText: 'Delete' }).click();
+  await sheet.waitFor({ state: 'detached' });
+  await eventually(async () => assert.equal(await page.evaluate(() => window.prayerTracker.store.list('clergy').items.length), 20));
+  await page.reload();
+  await page.locator('h1').first().waitFor();
+  assert.equal(await page.evaluate(() => window.prayerTracker.store.list('clergy').items.length), 20);
+  assert.ok(!(await page.evaluate(() => window.prayerTracker.store.list('clergy').items.map((i) => i.text))).includes('Dr. Chris Corbin'));
+});
+
+await step('the editions keep their data apart, and each has its page of instructions', async () => {
+  const keys = await page.evaluate(() => Object.keys(localStorage).filter((k) => k.endsWith(':data')).sort());
+  assert.deepEqual(keys, ['prayer-tracker-eastern-ridges:data', 'prayer-tracker-wisconsin:data']);
+  for (const ed of ['wisconsin', 'eastern-ridges']) {
+    await page.goto(`${BASE}${ed}/install.html`);
+    assert.match(await page.locator('#address').innerText(), new RegExp(`${ed}/$`));
+    assert.match(await page.locator('main').innerText(), /Lesser Feasts and Fasts[\s\S]*Choose the PDF/);
+  }
+  assert.match(await page.locator('main').innerText(), /To take your own name off:/);
+  await shot('62-eastern-ridges-install');
+});
+
+await step('no errors in the console (part 4)', async () => {
+  assert.deepEqual(problems4, []);
+});
+await context4.close();
 
 await writeFile(`${OUT}summary.txt`, `${passed} steps passed\n`);
 console.log(`\n${passed} steps passed`);

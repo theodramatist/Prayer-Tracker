@@ -2,13 +2,13 @@
 // and served from the cache afterwards. Bump VERSION (and js/version.js) on
 // every release so phones pick up the new files.
 
-const VERSION = '2.10.0';
+const VERSION = '2.11.0';
 const CACHE = `prayer-tracker-${VERSION}`;
-// This copy's own caches, and not the public edition's (prayer-tracker-public-…),
-// which can live at the same web address.
+// This copy's own caches, and not the other editions' (prayer-tracker-public-…,
+// prayer-tracker-wisconsin-…), which can live at the same web address.
 const OWN_CACHE = /^prayer-tracker-\d/;
-// The public edition lives in its own folder, with its own service worker.
-const ELSEWHERE = new URL('./everyone/', self.location).pathname;
+// The editions for anyone live in folders of their own, each with its own service worker.
+const ELSEWHERE = ['everyone', 'wisconsin', 'eastern-ridges'].map((d) => new URL(`./${d}/`, self.location).pathname);
 
 const ASSETS = [
   './',
@@ -20,6 +20,7 @@ const ASSETS = [
   './js/calendar.js',
   './js/collects.js',
   './js/dates.js',
+  './js/diocesan-seed.js',
   './js/edition.js',
   './js/extras.js',
   './js/importer.js',
@@ -84,7 +85,7 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
-  if (url.pathname.startsWith(ELSEWHERE)) return;
+  if (ELSEWHERE.some((p) => url.pathname.startsWith(p))) return;
 
   event.respondWith((async () => {
     const cache = await caches.open(CACHE);

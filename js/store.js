@@ -33,6 +33,11 @@ function seedItem(seed, entry, k, today) {
   if (entry.note) item.note = entry.note;
   if (entry.day != null) item.day = entry.day;
   if (entry.date) item.date = entry.date;
+  // A name given as first and last ("Andy" "Cruz Lillegard"), for last-name order.
+  if (entry.last != null) {
+    item.first = entry.first || '';
+    item.last = entry.last;
+  }
   return item;
 }
 

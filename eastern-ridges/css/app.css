@@ -1,0 +1,1280 @@
+/* Prayer Tracker — an ancient-future prayer book for the phone.
+   Fraunces for headings and prayers, Instrument Sans for lists and controls.
+   Colours are tokens on :root: burgundy on warm ivory by default, or deep blue
+   on linen, or the liturgical colour of the day (data-palette), each with dark
+   values (data-theme). The ribbon on Today always shows the colour of the day. */
+
+@font-face {
+  font-family: "Fraunces";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url(../fonts/fraunces-latin-full-normal.woff2) format("woff2-variations"), url(../fonts/fraunces-latin-full-normal.woff2) format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Fraunces";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url(../fonts/fraunces-latin-ext-full-normal.woff2) format("woff2-variations"), url(../fonts/fraunces-latin-ext-full-normal.woff2) format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: "Fraunces";
+  font-style: italic;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url(../fonts/fraunces-latin-full-italic.woff2) format("woff2-variations"), url(../fonts/fraunces-latin-full-italic.woff2) format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Fraunces";
+  font-style: italic;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url(../fonts/fraunces-latin-ext-full-italic.woff2) format("woff2-variations"), url(../fonts/fraunces-latin-ext-full-italic.woff2) format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: "Instrument Sans";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400 700;
+  font-stretch: 75% 100%;
+  src: url(../fonts/instrument-sans-latin-standard-normal.woff2) format("woff2-variations"), url(../fonts/instrument-sans-latin-standard-normal.woff2) format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Instrument Sans";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400 700;
+  font-stretch: 75% 100%;
+  src: url(../fonts/instrument-sans-latin-ext-standard-normal.woff2) format("woff2-variations"), url(../fonts/instrument-sans-latin-ext-standard-normal.woff2) format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+:root {
+  /* Burgundy on warm ivory: the app's own colours (Settings → Colour). */
+  --bg: #f6f0e8;
+  --surface: #fdfaf5;
+  --surface-2: #efe6db;
+  --text: #261b19;
+  --text-2: #57463f;
+  --text-3: #8b7a71;
+  --line: #e8dccf;
+  --line-strong: #d6c5b5;
+  --brand: #8a2433;
+  --danger: #b3261e;
+  --warn-bg: #f7e6cc;
+  --warn-text: #6b3f0c;
+  --shadow: 0 1px 0 rgb(70 30 25 / 4%), 0 8px 24px -12px rgb(70 30 25 / 18%);
+  --shadow-lg: 0 18px 50px -12px rgb(50 18 14 / 35%);
+
+  /* The colours of the church year (deep, like old vestment dyes): the
+     ribbon on Today, and the whole app if you choose "Church year". */
+  --lit-green: #3d6b52;
+  --lit-blue: #2e4f86;
+  --lit-violet: #5d3f87;
+  --lit-white: #85621a;
+  --lit-red: #a1342a;
+  --lit-rose: #9e4569;
+  --lit-none: #4a5266;
+  --accent: var(--brand);
+  --accent-ink: #ffffff;
+
+  --radius: 16px;
+  --radius-sm: 11px;
+  --tabbar-h: 62px;
+  --font-serif: "Fraunces", ui-serif, "Iowan Old Style", Palatino, Georgia, serif;
+  --font-sans: "Instrument Sans", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  color-scheme: light;
+}
+
+/* Dark: candle-lit, with the burgundy warmed to rose. The page sets
+   data-theme before it first paints (index.html), following the device or
+   the choice in Settings. */
+:root[data-theme="dark"] {
+  --bg: #161110;
+  --surface: #201816;
+  --surface-2: #2c2220;
+  --text: #f4eae5;
+  --text-2: #cdbcb4;
+  --text-3: #9a8880;
+  --line: #322724;
+  --line-strong: #4a3b36;
+  --brand: #e8959c;
+  --danger: #ff8f84;
+  --warn-bg: #3b2a14;
+  --warn-text: #f2cf92;
+  --shadow: 0 1px 0 rgb(0 0 0 / 30%), 0 10px 26px -14px rgb(0 0 0 / 70%);
+  --shadow-lg: 0 18px 50px -10px rgb(0 0 0 / 75%);
+  --lit-green: #8cc6a4;
+  --lit-blue: #9db9ef;
+  --lit-violet: #c3a9ec;
+  --lit-white: #e6c776;
+  --lit-red: #f39d91;
+  --lit-rose: #f0a7c3;
+  --lit-none: #b6c1d6;
+  --accent-ink: #1c1211;
+  color-scheme: dark;
+}
+
+/* Deep blue on linen. */
+:root[data-palette="blue"] {
+  --bg: #f1f0eb;
+  --surface: #fbfaf7;
+  --surface-2: #e6e4dd;
+  --text: #1b1e25;
+  --text-2: #484d58;
+  --text-3: #7c818b;
+  --line: #dedcd4;
+  --line-strong: #cac7be;
+  --brand: #284878;
+  --shadow: 0 1px 0 rgb(25 35 60 / 4%), 0 8px 24px -12px rgb(25 35 60 / 18%);
+  --shadow-lg: 0 18px 50px -12px rgb(15 22 40 / 35%);
+}
+:root[data-palette="blue"][data-theme="dark"] {
+  --bg: #0f1218;
+  --surface: #171b23;
+  --surface-2: #212732;
+  --text: #ebeef3;
+  --text-2: #b9c0cc;
+  --text-3: #868e9b;
+  --line: #262c37;
+  --line-strong: #3a4250;
+  --brand: #a3bdf0;
+  --accent-ink: #0f1218;
+  --shadow: 0 1px 0 rgb(0 0 0 / 30%), 0 10px 26px -14px rgb(0 0 0 / 70%);
+  --shadow-lg: 0 18px 50px -10px rgb(0 0 0 / 75%);
+}
+
+/* Church year: parchment, and the accent in the liturgical colour of the day. */
+:root[data-palette="season"] {
+  --bg: #f3eee3;
+  --surface: #fbf8f1;
+  --surface-2: #ebe4d6;
+  --text: #1e1b16;
+  --text-2: #4f493f;
+  --text-3: #857c6d;
+  --line: #e0d7c5;
+  --line-strong: #cec3ad;
+  --shadow: 0 1px 0 rgb(60 45 20 / 4%), 0 8px 24px -12px rgb(60 45 20 / 18%);
+  --shadow-lg: 0 18px 50px -12px rgb(40 28 8 / 35%);
+  --accent: var(--lit-none);
+}
+:root[data-palette="season"][data-theme="dark"] {
+  --bg: #13110e;
+  --surface: #1c1a16;
+  --surface-2: #29261f;
+  --text: #f1ebdf;
+  --text-2: #c2b9a8;
+  --text-3: #8f8676;
+  --line: #2f2b24;
+  --line-strong: #463f34;
+  --accent-ink: #13110e;
+}
+:root[data-palette="season"][data-season="green"] { --accent: var(--lit-green); }
+:root[data-palette="season"][data-season="blue"] { --accent: var(--lit-blue); }
+:root[data-palette="season"][data-season="violet"] { --accent: var(--lit-violet); }
+:root[data-palette="season"][data-season="white"] { --accent: var(--lit-white); }
+:root[data-palette="season"][data-season="red"] { --accent: var(--lit-red); }
+:root[data-palette="season"][data-season="rose"] { --accent: var(--lit-rose); }
+:root { --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent); }
+
+/* ---------- base ---------- */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  background: var(--bg);
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--text);
+  font: 450 17px/1.42 var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  overflow-x: hidden;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-serif);
+  font-weight: 560;
+  font-variation-settings: "SOFT" 40, "WONK" 0;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+p { margin: 0; }
+a { color: var(--accent); }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+[hidden] { display: none !important; }
+code { font: 0.92em/1 ui-monospace, "SF Mono", Menlo, monospace; padding: 1px 5px; border-radius: 6px; background: var(--surface-2); }
+
+/* Small capitals in the rubric colour: the prayer-book voice for labels. */
+.rubric, .day-rel, .group-label, .field-label, .pray-eyebrow, .carried-head, .detail-head .count, .prayer-title, .feast-detail, .office-head {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.icon {
+  width: 22px; height: 22px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+:focus-visible { outline: 2.5px solid var(--accent); outline-offset: 2px; }
+
+.view {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: calc(var(--safe-top) + 10px) 16px calc(var(--tabbar-h) + var(--safe-bottom) + 40px);
+  outline: none;
+}
+
+/* ---------- buttons ---------- */
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  min-height: 44px;
+  padding: 10px 17px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 560;
+  font-size: 16px;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color .15s, transform .1s, border-color .15s;
+}
+.btn:active { transform: scale(.98); }
+.btn .icon { width: 19px; height: 19px; }
+.btn-sm { min-height: 38px; padding: 7px 13px; font-size: 15px; }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn-primary:disabled { opacity: .45; cursor: default; }
+.btn-quiet { background: transparent; border-color: transparent; color: var(--text-2); }
+.btn-quiet:disabled { opacity: .35; }
+.btn-danger { color: var(--danger); background: transparent; border-color: transparent; padding-left: 4px; }
+.btn-danger-fill { background: var(--danger); border-color: var(--danger); color: #fff; }
+:root[data-theme="dark"] .btn-danger-fill { color: #2a0705; }
+.btn-block { width: 100%; }
+
+.icon-btn {
+  display: inline-grid; place-items: center;
+  width: 44px; height: 44px;
+  border: 0; border-radius: 50%;
+  background: transparent;
+  color: var(--text-2);
+  text-decoration: none;
+}
+.icon-btn:active { background: var(--surface-2); }
+.icon-btn:disabled { opacity: .3; }
+
+.link-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  min-height: 36px;
+  padding: 6px 4px;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 15px;
+}
+.link-btn .icon { width: 17px; height: 17px; }
+
+.pill {
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--accent);
+  border-radius: 999px;
+  padding: 5px 14px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* ---------- Today: header ---------- */
+
+.day-head {
+  --ribbon: var(--accent);
+  position: relative;
+  display: grid;
+  grid-template-columns: 44px 1fr 44px;
+  align-items: center;
+  gap: 4px;
+  padding: 18px 0 6px;
+}
+.day-head[data-color="green"] { --ribbon: var(--lit-green); }
+.day-head[data-color="blue"] { --ribbon: var(--lit-blue); }
+.day-head[data-color="violet"] { --ribbon: var(--lit-violet); }
+.day-head[data-color="white"] { --ribbon: var(--lit-white); }
+.day-head[data-color="red"] { --ribbon: var(--lit-red); }
+.day-head[data-color="rose"] { --ribbon: var(--lit-rose); }
+
+/* A prayer-book ribbon marker in the colour of the day. */
+.ribbon {
+  position: absolute;
+  top: calc(-10px - var(--safe-top));
+  right: 6px;
+  width: 13px;
+  height: calc(54px + var(--safe-top));
+  background: var(--ribbon);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% calc(100% - 8px), 0 100%);
+  box-shadow: inset -3px 0 0 rgb(0 0 0 / 12%);
+}
+
+.day-title { position: relative; text-align: center; min-width: 0; }
+.day-title h1 { display: flex; flex-direction: column; align-items: center; }
+.day-title h1 .wd {
+  font-size: 19px;
+  line-height: 1.2;
+  font-weight: 460;
+  font-style: italic;
+  color: var(--text-2);
+  font-variation-settings: "SOFT" 100, "WONK" 1;
+}
+.day-title h1 .md {
+  /* Sized so the longest ("September 30") stays on one line between the arrows. */
+  font-size: min(38px, calc((100vw - 128px) / 6.8));
+  line-height: 1.08;
+  font-weight: 560;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  font-variation-settings: "SOFT" 50, "WONK" 1;
+}
+.day-rel { color: var(--text-3); margin-bottom: 6px; }
+.day-rel.away { color: var(--accent); }
+:root[data-palette="season"] .day-rel.away, :root[data-palette="season"] .feast { color: var(--ribbon); }
+.feast {
+  margin-top: 6px;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 16px;
+  font-variation-settings: "SOFT" 80;
+  color: var(--accent);
+  text-wrap: balance;
+}
+.feast.is-feast { font-size: 16.5px; font-weight: 520; }
+.feast-detail { margin-top: 3px; color: var(--text-3); font-size: 11px; }
+.date-overlay {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  opacity: 0;
+  border: 0;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.date-overlay::-webkit-calendar-picker-indicator { position: absolute; inset: 0; width: 100%; height: 100%; cursor: pointer; }
+.back-today { grid-column: 1 / -1; justify-self: center; margin-top: 8px; }
+
+/* ---------- Today: progress, prayer start, filters ---------- */
+
+.progress { margin: 16px 2px 2px; }
+.progress-bar {
+  height: 4px;
+  border-radius: 99px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.progress-bar span {
+  display: block; height: 100%;
+  background: var(--accent);
+  border-radius: inherit;
+  transition: width .35s ease;
+}
+.progress-text { margin-top: 7px; font-size: 13.5px; color: var(--text-3); text-align: center; font-variant-numeric: tabular-nums; }
+
+.pray-start { display: flex; justify-content: center; margin-top: 14px; }
+.btn-pray {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line-strong));
+  color: var(--accent);
+  background: var(--surface);
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 520;
+  font-size: 17px;
+  font-variation-settings: "SOFT" 80;
+  padding-inline: 20px;
+}
+.btn-pray .icon { width: 20px; height: 20px; }
+
+.chips {
+  display: flex; gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 2px 1px;
+  -webkit-overflow-scrolling: touch;
+}
+.chips::-webkit-scrollbar { display: none; }
+.chips-wrap { flex-wrap: wrap; overflow: visible; }
+.filter-chips { margin: 16px -16px 2px; padding: 2px 16px; scroll-padding: 16px; }
+/* With a mouse there's no swipe, so rows of chips that scroll sideways on a
+   phone wrap onto more lines instead, with every chip in view. */
+@media (hover: hover) and (pointer: fine) {
+  .filter-chips, .chips-lists { flex-wrap: wrap; overflow-x: visible; }
+}
+.chip {
+  flex: none;
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 36px;
+  padding: 6px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: 15px;
+  font-weight: 540;
+  white-space: nowrap;
+}
+.chip.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.chip-sub { font-size: 12.5px; font-weight: 650; opacity: .7; font-variant-numeric: tabular-nums; }
+.chip.on .chip-sub { opacity: .85; }
+
+/* ---------- Today: lists and entries ---------- */
+
+.group { margin-top: 26px; }
+.group-head {
+  display: flex; align-items: baseline; gap: 9px;
+  padding: 0 4px 9px;
+}
+.group-head h2 { font-size: 22px; line-height: 1.2; min-width: 0; }
+.group-label { color: var(--accent); white-space: nowrap; }
+.group-count {
+  margin-left: auto;
+  min-width: 26px; height: 22px;
+  display: inline-grid; place-items: center;
+  padding: 0 8px;
+  border-radius: 99px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 13px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  align-self: center;
+}
+.group-count .icon { width: 15px; height: 15px; stroke-width: 2.6; }
+.group-complete { margin-top: 14px; }
+.group-complete .group-head { padding-bottom: 0; }
+.group-complete h2 { color: var(--text-3); }
+
+/* The list's prayer, folded under its heading. */
+.prayer {
+  margin: -2px 4px 10px;
+  border-left: 2px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  padding: 0 0 0 12px;
+}
+.prayer summary {
+  display: flex; flex-direction: column; gap: 2px;
+  cursor: pointer;
+  list-style: none;
+}
+.prayer summary::-webkit-details-marker { display: none; }
+.prayer-title { color: var(--accent); font-size: 11px; }
+.prayer-first {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 15.5px;
+  color: var(--text-2);
+  font-variation-settings: "SOFT" 80;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.prayer[open] .prayer-first { display: none; }
+.prayer-text {
+  margin-top: 4px;
+  font-family: var(--font-serif);
+  font-size: 16.5px;
+  line-height: 1.55;
+  color: var(--text);
+  font-variation-settings: "SOFT" 60;
+  text-wrap: pretty;
+}
+
+/* The Collect of the Day, folded like a list's prayer, ahead of the lists. */
+.collect-day { margin-top: 20px; }
+.collect-day .prayer { margin: 0 4px; }
+.collect-day .prayer + .prayer { margin-top: 14px; }
+.collect-source, .pray-source { color: var(--text-3); font-size: 13px; line-height: 1.4; }
+.collect-source { margin-top: 8px; }
+.pray-source { margin-top: 16px; }
+
+.items {
+  list-style: none;
+  margin: 0; padding: 0;
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+.items-done { margin-top: 10px; background: transparent; box-shadow: none; border: 1px dashed var(--line-strong); }
+
+.item {
+  display: flex; align-items: stretch;
+  position: relative;
+  overflow: hidden;
+  transition: height .28s ease, opacity .22s ease, transform .28s ease;
+}
+.item + .item::before {
+  content: "";
+  position: absolute; top: 0; left: 56px; right: 0;
+  border-top: 1px solid var(--line);
+}
+.item.leaving { opacity: 0; transform: translateX(24px); }
+
+.check {
+  flex: none;
+  width: 56px;
+  display: grid; place-items: center;
+  border: 0; padding: 0;
+  background: transparent;
+  color: transparent;
+}
+.check .icon {
+  width: 27px; height: 27px;
+  padding: 4px;
+  border: 1.6px solid var(--line-strong);
+  border-radius: 50%;
+  stroke-width: 3;
+  transition: background-color .18s, border-color .18s, color .18s, transform .18s;
+}
+.check:active .icon { transform: scale(.88); }
+.item.checked .check .icon,
+.item.done .check .icon { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.item.checked .check .icon { animation: pop .3s ease; }
+
+.item-body {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 1px;
+  min-height: 56px;
+  padding: 11px 16px 11px 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+.item-text { font-size: 17px; font-weight: 500; overflow-wrap: anywhere; }
+.item-note {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 15px;
+  color: var(--text-2);
+  font-variation-settings: "SOFT" 80;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.item.done .item-text { color: var(--text-3); text-decoration: line-through; text-decoration-color: var(--line-strong); }
+.item.done .item-note { color: var(--text-3); }
+
+.badge {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 1px 8px;
+  border-radius: 99px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 12.5px; font-weight: 600;
+  white-space: nowrap;
+}
+.badge-warn { background: var(--warn-bg); color: var(--warn-text); }
+.badge-from { background: var(--accent-soft); color: var(--accent); }
+
+/* Morning Prayer: lists read aloud in the office, each marked once. */
+.office { margin-top: 24px; }
+.office-head { color: var(--accent); padding: 0 4px 8px; }
+.office-list {
+  padding: 14px 16px 10px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+}
+.office-list + .office-list { margin-top: 12px; }
+.office-title { display: flex; align-items: baseline; gap: 10px; }
+.office-title h2 { font-size: 22px; line-height: 1.2; min-width: 0; }
+.office-title .group-count { margin-left: auto; align-self: center; }
+.office-names {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  columns: 2 9.5em;
+  column-gap: 20px;
+  font-size: 16px;
+  line-height: 1.55;
+}
+.office-names li { break-inside: avoid; }
+.office-foot { display: flex; justify-content: flex-end; margin-top: 10px; }
+.office-list.done .office-names { color: var(--text-3); }
+
+/* Sharing a request with a parish's prayer list (full edition): the form's questions, under the switch. */
+.share { margin-top: 12px; }
+.share-body {
+  margin-top: 6px;
+  padding: 4px 14px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+.share-body > .hint:first-child { margin-top: 10px; }
+.radio-list { display: grid; gap: 6px; }
+.radio-row {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: 15.5px; line-height: 1.35;
+  cursor: pointer;
+}
+.radio-row input { flex: none; width: 18px; height: 18px; margin: 1px 0 0; accent-color: var(--accent); }
+.radio-row:has(input:checked) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
+.share-preview {
+  margin: 10px 0 0;
+  padding: 8px 12px;
+  border-left: 3px solid var(--accent);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: var(--surface);
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 16.5px;
+}
+.share-open { margin-top: 2px; }
+
+/* Prayers: paragraphs, and the people's responses and rubrics in italics. */
+.prayer + .prayer { margin-top: -4px; }
+.prayer[open] { margin-bottom: 18px; }
+.prayer[open] + .prayer { margin-top: 0; }
+.prayer-text p + p, .pray-prayer-text p + p { margin-top: .55em; }
+.prayer-response { color: var(--text-2); }
+.prayer-read { font-size: 17.5px; }
+.item-note.item-prayer {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  white-space: normal;
+}
+
+/* The prayers a list opens with, in its settings. */
+.prayer-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.prayer-row {
+  padding: 8px 10px 4px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.prayer-row-head { display: flex; align-items: center; gap: 8px; }
+.prayer-row-title { flex: 1; min-width: 0; font-family: var(--font-serif); font-size: 16.5px; text-wrap: balance; }
+.prayer-row-tools { display: flex; gap: 2px; }
+.prayer-row-tools .icon-btn { width: 36px; height: 36px; }
+.prayer-row .link-btn { font-size: 14px; }
+.prayer-add { display: grid; gap: 6px; margin-top: 10px; }
+
+/* Choosing prayers and thanksgivings: folded headings, a search, checkboxes. */
+.picker .search { margin-bottom: 8px; }
+.picker-count { margin: 0 2px 10px; }
+.picker-sections { display: grid; gap: 8px; }
+.picker-section {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.picker-own { margin-top: 8px; }
+.picker-section > summary {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  padding: 12px 14px;
+  cursor: pointer;
+  list-style: none;
+}
+.picker-section > summary::-webkit-details-marker { display: none; }
+.picker-heading { font-family: var(--font-serif); font-size: 17px; font-weight: 520; }
+.picker-chosen { color: var(--accent); font-size: 13px; font-weight: 650; white-space: nowrap; }
+.picker-list { list-style: none; margin: 0; padding: 0 12px 6px; }
+.picker-row { padding: 8px 0; border-top: 1px solid var(--line); }
+.picker-check { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
+.picker-check input { flex: none; width: 20px; height: 20px; margin: 1px 0 0; accent-color: var(--accent); }
+.picker-title { font-size: 16px; line-height: 1.35; }
+.picker-words { margin: 4px 0 0 30px; }
+.picker-words > summary {
+  color: var(--text-3);
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 14.5px;
+  cursor: pointer;
+  list-style: none;
+}
+.picker-words > summary::-webkit-details-marker { display: none; }
+.picker-words[open] > summary { display: none; }
+.picker-words .prayer-text { font-size: 15.5px; }
+.picker-own .prayer-edit { padding: 0 12px 12px; }
+
+/* "Prayed for all": a list read out in one go. */
+.group-foot { display: flex; justify-content: flex-end; padding: 2px 4px 0; }
+.group-foot .link-btn { font-size: 14px; }
+
+/* Entries still owed from earlier days. */
+.carried { margin-top: 12px; }
+.carried-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 0 4px 6px;
+  color: var(--text-3);
+}
+.carried-head .link-btn { text-transform: none; letter-spacing: 0; font-size: 14px; }
+.items-carried { background: color-mix(in srgb, var(--surface) 70%, var(--bg)); box-shadow: none; border-style: dashed; }
+
+@keyframes pop { 0% { transform: scale(.8); } 60% { transform: scale(1.12); } 100% { transform: scale(1); } }
+
+.show-done { display: flex; justify-content: center; margin-top: 20px; }
+.btn-quiet .icon { width: 18px; height: 18px; }
+
+/* ---------- cards & banners ---------- */
+
+.setup-card, .notice-card, .empty-card, .complete-card, .banner {
+  margin-top: 18px;
+  padding: 16px;
+  border-radius: var(--radius);
+}
+.setup-card { border: 1.5px dashed var(--line-strong); background: transparent; }
+.setup-card h2 { font-size: 20px; margin-bottom: 4px; }
+.setup-name { display: grid; gap: 4px; margin: 6px 0 10px; }
+.setup-card p, .notice-card p, .empty-card p, .banner p { color: var(--text-2); font-size: 15.5px; }
+.setup-actions, .banner-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+.notice-card { background: var(--warn-bg); }
+.notice-card p { color: var(--warn-text); }
+.banner { background: var(--surface); box-shadow: var(--shadow); border: 1px solid var(--line); border-left: 4px solid var(--accent); }
+.banner-warn { background: var(--warn-bg); border-color: transparent; border-left-color: var(--warn-text); }
+.banner-warn p { color: var(--warn-text); }
+.empty-card { text-align: center; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow); padding: 26px 18px; }
+.empty-title { font-family: var(--font-serif); font-size: 20px; color: var(--text) !important; margin-bottom: 6px; }
+.inline-plus {
+  display: inline-grid; place-items: center;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  background: var(--accent); color: var(--accent-ink);
+  font-weight: 700; line-height: 1;
+}
+.empty-note { margin: 18px 4px; color: var(--text-3); font-size: 15.5px; }
+
+.ornament { display: block; font-size: 22px; line-height: 1; color: var(--accent); }
+.complete-card { text-align: center; padding: 30px 16px 12px; }
+.complete-title { margin-top: 12px; font-size: 16px; color: var(--text-2); }
+.complete-response {
+  margin-top: 4px;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 28px;
+  font-weight: 460;
+  font-variation-settings: "SOFT" 100, "WONK" 1;
+  color: var(--accent);
+}
+
+/* ---------- tab bar ---------- */
+
+.tabbar {
+  position: fixed; left: 0; right: 0; bottom: 0;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: 1fr 88px 1fr;
+  align-items: center;
+  height: calc(var(--tabbar-h) + var(--safe-bottom));
+  padding: 0 max(12px, calc((100vw - 640px) / 2)) var(--safe-bottom);
+  background: color-mix(in srgb, var(--surface) 86%, transparent);
+  -webkit-backdrop-filter: saturate(1.4) blur(18px);
+  backdrop-filter: saturate(1.4) blur(18px);
+  border-top: 1px solid var(--line);
+}
+.tab {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 6px 0;
+  color: var(--text-3);
+  text-decoration: none;
+  font-size: 11.5px; font-weight: 650;
+  letter-spacing: .02em;
+}
+.tab.active { color: var(--accent); }
+.tab .icon { width: 25px; height: 25px; }
+.tab-add {
+  justify-self: center;
+  width: 60px; height: 60px;
+  margin-top: -26px;
+  display: grid; place-items: center;
+  border: 4px solid var(--bg);
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  box-shadow: 0 8px 20px -6px color-mix(in srgb, var(--accent) 60%, transparent);
+  transition: transform .12s;
+}
+.tab-add:active { transform: scale(.93); }
+.tab-add .icon { width: 28px; height: 28px; stroke-width: 2.3; }
+
+/* ---------- toast ---------- */
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 18px);
+  z-index: 50;
+  display: flex; align-items: center; gap: 12px;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  padding: 10px 10px 10px 18px;
+  border-radius: 14px;
+  background: var(--text);
+  color: var(--bg);
+  box-shadow: var(--shadow-lg);
+  font-size: 15px;
+  opacity: 0;
+  transform: translate(-50%, 12px);
+  pointer-events: none;
+  transition: opacity .2s, transform .2s;
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+.toast-msg { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 6px 0; }
+.toast-action {
+  flex: none;
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 0; border-radius: 9px;
+  background: color-mix(in srgb, var(--bg) 16%, transparent);
+  color: var(--bg);
+  font-weight: 700;
+  font-size: 15px;
+}
+.sheet .toast, .pray .toast { bottom: calc(var(--kb, 0px) + 16px); }
+
+/* ---------- sheets ---------- */
+
+.sheet {
+  position: fixed;
+  inset: auto 0 var(--kb, 0px) 0;
+  width: 100%;
+  max-width: 640px;
+  max-height: calc(var(--vvh, 100dvh) - var(--safe-top) - 12px);
+  margin: 0 auto;
+  padding: 0;
+  border: 0;
+  border-radius: 22px 22px 0 0;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden auto;
+  overscroll-behavior: contain;
+  animation: sheet-in .26s cubic-bezier(.2, .8, .25, 1);
+}
+.sheet.closing { animation: sheet-out .16s ease-in forwards; }
+.sheet::backdrop { background: rgb(20 14 4 / 40%); animation: fade-in .2s ease; }
+.sheet.closing::backdrop { animation: fade-out .16s ease-in forwards; }
+
+@keyframes sheet-in { from { transform: translateY(100%); } }
+@keyframes sheet-out { to { transform: translateY(100%); } }
+@keyframes fade-in { from { opacity: 0; } }
+@keyframes fade-out { to { opacity: 0; } }
+
+.sheet-grip { width: 38px; height: 5px; margin: 8px auto 0; border-radius: 9px; background: var(--line-strong); }
+.sheet-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 4px 8px 0 20px;
+}
+.sheet-head h2 { font-size: 23px; min-width: 0; overflow-wrap: anywhere; }
+.sheet-body { padding: 8px 20px calc(18px + var(--safe-bottom)); }
+.sheet-text { color: var(--text-2); font-size: 15.5px; margin-bottom: 12px; }
+.sheet-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+.sheet-actions-split { justify-content: space-between; }
+.sheet-confirm .sheet-actions .btn { flex: 1; }
+
+@media (min-width: 700px) {
+  .sheet {
+    inset: auto 0 calc(var(--kb, 0px) + 7vh) 0;
+    border-radius: 22px;
+    max-width: 560px;
+    max-height: 86vh;
+  }
+  .sheet-grip { display: none; }
+  .sheet-head { padding-top: 14px; }
+  .sheet-body { padding-bottom: 22px; }
+}
+
+/* ---------- forms ---------- */
+
+.field { margin-top: 16px; }
+.field-label { display: block; margin: 0 0 8px 2px; color: var(--text-3); }
+.field-hint { margin: -2px 2px 8px; }
+.input {
+  display: block;
+  width: 100%;
+  min-height: 46px;
+  padding: 11px 13px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 17px;
+  line-height: 1.35;
+}
+.input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+textarea.input { resize: vertical; }
+.input-lg { font-size: 19px; padding: 13px 14px; }
+textarea.add-text { resize: none; min-height: 56px; }
+.prayer-input { font-family: var(--font-serif); font-size: 16.5px; line-height: 1.5; }
+.prayer-edit { display: grid; gap: 8px; margin-top: 8px; }
+select.input { appearance: none; -webkit-appearance: none; background-image: linear-gradient(45deg, transparent 50%, var(--text-3) 50%), linear-gradient(135deg, var(--text-3) 50%, transparent 50%); background-position: calc(100% - 20px) 50%, calc(100% - 14px) 50%; background-size: 6px 6px; background-repeat: no-repeat; padding-right: 36px; }
+input[type="date"].input { -webkit-appearance: none; appearance: none; min-width: 0; }
+.hint { color: var(--text-3); font-size: 14px; margin-top: 6px; }
+.multi-hint { margin: 6px 2px 0; }
+.until-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.until-row span { color: var(--text-2); font-size: 15px; }
+.until-row .input { flex: 1; }
+.chips-lists { margin: 0 -20px; padding: 2px 20px; scroll-padding: 20px; }
+.chips-days .chip { min-width: 58px; justify-content: center; flex-direction: column; gap: 0; min-height: 50px; padding: 4px 8px; }
+
+.month-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+.day-cell {
+  position: relative;
+  aspect-ratio: 1.15;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text-2);
+  font-size: 15px; font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.day-cell.has::after {
+  content: "";
+  position: absolute; left: 50%; bottom: 5px;
+  width: 4px; height: 4px; margin-left: -2px;
+  border-radius: 50%;
+  background: var(--text-3);
+}
+.day-cell.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.day-cell.on::after { background: var(--accent-ink); }
+
+.type-cards { display: grid; gap: 8px; }
+.type-card {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  padding: 12px 14px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  text-align: left;
+}
+.type-card.on { border-color: var(--accent); background: var(--accent-soft); }
+.type-name { font-weight: 650; }
+.type-blurb { font-size: 14px; color: var(--text-2); }
+
+.toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 0; }
+.toggle-text { display: flex; flex-direction: column; gap: 2px; cursor: pointer; }
+.toggle-label { font-weight: 580; }
+.switch { position: relative; flex: none; width: 51px; height: 31px; }
+.switch input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; z-index: 1; }
+.switch-track { position: absolute; inset: 0; border-radius: 99px; background: var(--line-strong); transition: background-color .2s; }
+.switch-track::after {
+  content: "";
+  position: absolute; top: 2px; left: 2px;
+  width: 27px; height: 27px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 4px rgb(0 0 0 / 25%);
+  transition: transform .2s;
+}
+.switch input:checked + .switch-track { background: var(--accent); }
+.switch input:checked + .switch-track::after { transform: translateX(20px); }
+.switch input:focus-visible + .switch-track { outline: 2.5px solid var(--accent); outline-offset: 2px; }
+
+/* ---------- import ---------- */
+
+.import-text { min-height: 150px; font-size: 15.5px; line-height: 1.4; }
+.import-tools { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.import-status { color: var(--accent); }
+.preview { margin-top: 16px; }
+.preview:empty { display: none; }
+.preview-summary { display: flex; align-items: center; gap: 6px; font-weight: 650; color: var(--accent); }
+.preview-summary .icon { width: 18px; height: 18px; stroke-width: 2.6; }
+.preview-empty { color: var(--text-3); }
+.preview-list, .spread-preview {
+  list-style: none;
+  margin: 8px 0 0; padding: 4px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  font-size: 15px;
+}
+.preview-list li, .spread-preview li { display: flex; gap: 12px; padding: 7px 0; }
+.preview-list li + li, .spread-preview li + li { border-top: 1px solid var(--line); }
+.preview-key { flex: none; width: 86px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.preview-text { min-width: 0; display: flex; flex-direction: column; overflow-wrap: anywhere; }
+.preview-note { font-size: 13.5px; color: var(--text-3); }
+.spread-preview { margin-top: 16px; }
+
+/* ---------- pages (Lists, list detail, Settings) ---------- */
+
+.page-head {
+  display: flex; align-items: center; justify-content: space-between;
+  min-height: 48px;
+  margin: 0 -6px;
+}
+.page-head h1, .page-title { font-size: 34px; padding: 0 6px; font-variation-settings: "SOFT" 60, "WONK" 1; }
+.page-title { margin: 4px 0 6px; }
+.back-link {
+  display: inline-flex; align-items: center;
+  min-height: 44px;
+  padding: 0 8px 0 0;
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+.back-link .icon { width: 24px; height: 24px; }
+
+.list-cards { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 10px; }
+.list-card {
+  display: flex; align-items: center; gap: 12px;
+  min-height: 68px;
+  padding: 12px 10px 12px 16px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  color: var(--text);
+  text-decoration: none;
+}
+.list-card.is-hidden { opacity: .62; }
+.lc-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.lc-name { font-family: var(--font-serif); font-size: 20px; font-weight: 560; font-variation-settings: "SOFT" 40; }
+.lc-meta { font-size: 14px; color: var(--text-3); }
+.chev { color: var(--text-3); width: 20px; height: 20px; }
+.reorder { display: flex; gap: 2px; }
+.page-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+.page-hint { margin: 12px 4px 0; }
+
+.list-title { margin: 2px 0 12px; }
+.list-title h1 { font-size: 32px; line-height: 1.15; overflow-wrap: anywhere; font-variation-settings: "SOFT" 60, "WONK" 1; }
+.list-sub { margin-top: 4px; color: var(--text-3); font-size: 14.5px; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.search-wrap { position: relative; margin-top: 14px; }
+.search-wrap .icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 19px; height: 19px; color: var(--text-3); pointer-events: none; }
+.search { padding-left: 40px; background: var(--surface); }
+
+.detail-body { margin-top: 6px; }
+.detail-section { margin-top: 20px; }
+.detail-section.compact { margin-top: 14px; }
+.detail-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 4px 6px; min-height: 36px; }
+.detail-head h2 { font-size: 19px; display: flex; align-items: baseline; gap: 8px; }
+.detail-head .count { color: var(--text-3); }
+.add-to { font-size: 14.5px; }
+.rows {
+  list-style: none;
+  margin: 0; padding: 0;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.rows li + li { border-top: 1px solid var(--line); }
+.row {
+  display: flex; align-items: center; gap: 12px;
+  width: 100%;
+  min-height: 50px;
+  padding: 10px 16px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+.row:active { background: var(--surface-2); }
+.row-key { flex: none; width: 92px; font-size: 14px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.row-text { overflow-wrap: anywhere; font-weight: 500; }
+.row-note { font-family: var(--font-serif); font-style: italic; font-size: 14.5px; color: var(--text-2); white-space: pre-line; overflow-wrap: anywhere; }
+.row .badge { margin-top: 0; }
+
+.settings-card {
+  margin-top: 14px;
+  padding: 16px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+}
+.settings-card h2 { font-size: 21px; margin-bottom: 8px; }
+.settings-card > p { color: var(--text-2); font-size: 15.5px; }
+.settings-card > p + p { margin-top: 8px; }
+.settings-card .hint, .settings-card > p.hint { margin-top: 8px; color: var(--text-3); font-size: 14px; }
+.settings-card .field:first-of-type { margin-top: 10px; }
+.button-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.install-here { padding: 8px 10px; border-radius: var(--radius-sm); background: var(--accent-soft); }
+.steps { margin: 10px 0 4px; padding-left: 22px; color: var(--text-2); font-size: 15px; display: grid; gap: 6px; }
+.sync-status.is-error, .lff-status.is-error { color: var(--danger); }
+.lff-status:empty { display: none; }
+.noscript { padding: 24px; text-align: center; }
+
+/* ---------- pray-through ---------- */
+
+.pray {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: none;
+  margin: 0;
+  padding: var(--safe-top) 0 var(--safe-bottom);
+  border: 0;
+  background: var(--bg);
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  animation: fade-in .25s ease;
+}
+.pray:not([open]) { display: none; }
+.pray.closing { animation: fade-out .16s ease-in forwards; }
+.pray::backdrop { background: var(--bg); }
+.pray-top {
+  display: grid;
+  grid-template-columns: 52px 1fr 52px;
+  align-items: center;
+  padding: 6px 4px 0;
+}
+.pray-count { text-align: center; color: var(--text-3); font-size: 13.5px; font-variant-numeric: tabular-nums; }
+.pray-stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  padding: 12px 28px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  /* A soft edge above the buttons: a long prayer reads on below it. */
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 18px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 18px), transparent);
+}
+/* Centred while it fits; from the top, and scrollable, when it doesn't
+   (auto margins give way where align-items: center would cut it off). */
+.pray-card { width: 100%; max-width: 560px; margin: auto; padding: 8px 0 12px; text-align: center; }
+.pray-card.enter { animation: card-in .32s ease; }
+@keyframes card-in { from { opacity: 0; transform: translateY(10px); } }
+.pray-eyebrow { color: var(--accent); margin-bottom: 18px; }
+.pray-name {
+  font-size: min(42px, 10vw);
+  line-height: 1.12;
+  font-weight: 500;
+  font-variation-settings: "SOFT" 70, "WONK" 1;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+.pray-name.long { font-size: min(32px, 8vw); }
+.pray-note {
+  margin-top: 16px;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 19px;
+  line-height: 1.45;
+  color: var(--text-2);
+  font-variation-settings: "SOFT" 80;
+  white-space: pre-line;
+}
+.pray-from { margin-top: 14px; color: var(--text-3); font-size: 14px; }
+.pray-done { margin-top: 18px; display: inline-flex; align-items: center; gap: 6px; color: var(--accent); font-weight: 650; }
+.pray-done .icon { width: 18px; height: 18px; stroke-width: 2.6; }
+.pray-prayer-title { font-size: 26px; font-style: italic; font-weight: 460; font-variation-settings: "SOFT" 80; margin-bottom: 14px; text-wrap: balance; }
+.pray-prayer-text {
+  font-family: var(--font-serif);
+  font-size: 19px;
+  line-height: 1.6;
+  text-align: left;
+  font-variation-settings: "SOFT" 60;
+  text-wrap: pretty;
+}
+.pray-end .ornament { font-size: 28px; margin-bottom: 16px; }
+.pray-response {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: min(38px, 9vw);
+  font-weight: 460;
+  font-variation-settings: "SOFT" 100, "WONK" 1;
+  color: var(--accent);
+}
+.pray-summary { margin-top: 12px; color: var(--text-2); text-wrap: balance; }
+.pray-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px 18px;
+  max-width: 640px;
+  width: 100%;
+  margin: 0 auto;
+}
+.pray-actions .btn-quiet:first-child { margin-right: auto; }
+.btn-amen {
+  min-width: 132px;
+  min-height: 52px;
+  font-family: var(--font-serif);
+  font-size: 19px;
+  font-style: italic;
+  font-weight: 520;
+  font-variation-settings: "SOFT" 80;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+
+/* Line breaks: headings in lines of even length, and no word (or "⋯") left
+   alone on the last line of a hint or a paragraph. */
+h1, h2, h3, .feast, .complete-title, .pray-name, .picker-heading, .prayer-title, .toggle-label, .sheet-title { text-wrap: balance; }
+p, .hint, .toggle-text .hint, .sheet-text, .item-note, .row-note, .pray-note, .collect-source, .pray-source, li { text-wrap: pretty; }
+/* A person in an entry's details ("Pippa Lindwright, Rector") stays on one line where it fits. */
+.note-part { display: inline-block; }
+
+/* ---------- Reach out to: people to get in touch with ---------- */
+
+.reach { margin-top: 30px; }
+.reach-head { display: flex; align-items: baseline; gap: 9px; padding: 0 4px 9px; }
+.reach-head h2 { font-size: 22px; line-height: 1.2; min-width: 0; }
+.reach-item .item-body { padding-left: 16px; }
+.reach-item + .reach-item::before { left: 16px; }
+.reach-from { margin-top: 2px; color: var(--text-3); font-size: 13px; }
+.reach-done { flex: none; align-self: center; margin-right: 12px; }
+.reach-done .icon { width: 16px; height: 16px; }
+
+/* In pray-through: the button on a person's card, and the list at the end. */
+.pray-reach-toggle { margin-top: 26px; }
+.btn-reach { gap: 7px; }
+.btn-reach .icon { width: 17px; height: 17px; }
+.btn-reach.on { background: var(--accent-soft); border-color: transparent; color: var(--accent); }
+.pray-reach { margin: 30px auto 0; max-width: 360px; text-align: left; }
+.pray-reach .pray-eyebrow { text-align: center; margin-bottom: 10px; }
+.pray-reach-list {
+  list-style: none; margin: 0; padding: 0;
+  border-radius: var(--radius); background: var(--surface); border: 1px solid var(--line);
+}
+.pray-reach-list li { display: flex; align-items: baseline; gap: 10px; padding: 11px 14px; }
+.pray-reach-list li + li { border-top: 1px solid var(--line); }
+.pray-reach-name { flex: 1; min-width: 0; font-size: 17px; font-weight: 500; overflow-wrap: anywhere; }
+.pray-reach-from { color: var(--text-3); font-size: 13px; white-space: nowrap; }
+.pray-reach .pray-summary { text-align: center; font-size: 14.5px; }

@@ -2,10 +2,10 @@
 // and served from the cache afterwards. Bump VERSION (and js/version.js) on
 // every release so phones pick up the new files.
 
-const VERSION = '2.10.0';
+const VERSION = '2.11.0';
 const CACHE = `prayer-tracker-public-${VERSION}`;
-// This copy's own caches, and not the public edition's (prayer-tracker-public-…),
-// which can live at the same web address.
+// This copy's own caches, and not the other editions' (prayer-tracker-public-…,
+// prayer-tracker-wisconsin-…), which can live at the same web address.
 const OWN_CACHE = /^prayer-tracker-public-\d/;
 
 const ASSETS = [
@@ -13,10 +13,29 @@ const ASSETS = [
   './index.html',
   './manifest.webmanifest',
   './css/app.css',
+  './fonts/OFL-Fraunces.txt',
+  './fonts/OFL-InstrumentSans.txt',
+  './fonts/README.txt',
+  './fonts/fraunces-latin-ext-full-italic.woff2',
+  './fonts/fraunces-latin-ext-full-normal.woff2',
+  './fonts/fraunces-latin-full-italic.woff2',
+  './fonts/fraunces-latin-full-normal.woff2',
+  './fonts/instrument-sans-latin-ext-standard-normal.woff2',
+  './fonts/instrument-sans-latin-standard-normal.woff2',
+  './icons/apple-touch-icon.png',
+  './icons/favicon-32.png',
+  './icons/favicon.svg',
+  './icons/icon-192.png',
+  './icons/icon-512.png',
+  './icons/icon-maskable-512.png',
   './js/app.js',
   './js/bundles.js',
   './js/calendar.js',
   './js/collects.js',
+  './js/data/acp.js',
+  './js/data/collects.js',
+  './js/data/office.js',
+  './js/data/prayers.js',
   './js/dates.js',
   './js/edition.js',
   './js/extras.js',
@@ -40,22 +59,6 @@ const ASSETS = [
   './js/today.js',
   './js/ui.js',
   './js/version.js',
-  './js/data/acp.js',
-  './js/data/collects.js',
-  './js/data/office.js',
-  './js/data/prayers.js',
-  './fonts/fraunces-latin-ext-full-italic.woff2',
-  './fonts/fraunces-latin-ext-full-normal.woff2',
-  './fonts/fraunces-latin-full-italic.woff2',
-  './fonts/fraunces-latin-full-normal.woff2',
-  './fonts/instrument-sans-latin-ext-standard-normal.woff2',
-  './fonts/instrument-sans-latin-standard-normal.woff2',
-  './icons/apple-touch-icon.png',
-  './icons/favicon-32.png',
-  './icons/favicon.svg',
-  './icons/icon-192.png',
-  './icons/icon-512.png',
-  './icons/icon-maskable-512.png',
 ];
 
 self.addEventListener('install', (event) => {

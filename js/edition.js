@@ -1,8 +1,8 @@
 // Which edition of the app this is. This copy is the full one, with sync,
 // Share with Trinity, the diocese's cycles, Morning Prayer lists and Lesser
-// Feasts and Fasts. The public edition, built into everyone/ by
-// scripts/build-public.mjs, has its own copy of this file (edition/public/)
-// and stand-ins there for the modules it leaves out.
+// Feasts and Fasts. The editions for anyone, built into everyone/, wisconsin/
+// and eastern-ridges/ by scripts/build-editions.mjs, have their own copies of
+// this file (edition/<name>/js/) and stand-ins for the modules they leave out.
 export const EDITION = {
   id: 'personal',
   /** The start of every key the app keeps on the device. */
