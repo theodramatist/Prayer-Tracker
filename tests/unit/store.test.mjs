@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { Store, STORAGE_KEY, migrate, defaultState, stampAsNewest } from '../../js/store.js';
-import { itemsDue, endDateFor, carriedOver, builtinEntries, cycleSource, dayListFor, officeFor } from '../../js/schedule.js';
+import { itemsDue, endDateFor, carriedOver, builtinEntries, cycleSource, cycleRanOut, agenda, dayListFor, officeFor } from '../../js/schedule.js';
 import { BUNDLES } from '../../js/bundles.js';
 import { weekday } from '../../js/dates.js';
 
@@ -371,6 +371,61 @@ test('a newer edition takes over from its first day; the newest starts over afte
     assert.deepEqual(itemsDue(list, '2027-01-01').map((e) => [e.id, e.text]), [['acp2027:0', 'X']]);
     assert.equal(itemsDue(list, '2027-01-04')[0].text, 'Y');
     assert.equal(cycleSource(list, '2027-02-01').length, 2);
+  } finally {
+    BUNDLES.acp.pop();
+  }
+});
+
+test('a newer Anglican Cycle you load begins on its own first day, with the built-in one until then', () => {
+  const store = new Store(memoryStorage());
+  store.replaceCycle('anglican', { start: '2027-01-01', entries: [{ text: 'X', note: 'Province X', seq: 0 }, { text: 'Y', seq: 1 }] });
+  const list = store.list('anglican');
+  const on = (k) => itemsDue(list, k).map((e) => e.text);
+  assert.deepEqual(on('2026-12-30'), ['The Diocese of San Diego']);
+  assert.deepEqual(on('2026-12-31'), ['The Diocese of Divine Hope']);
+  assert.deepEqual(on('2027-01-01'), ['X']);
+  assert.equal(itemsDue(list, '2027-01-01')[0].note, 'Province X');
+  assert.deepEqual(on('2027-01-02'), ['Y']);
+  assert.deepEqual(on('2027-01-03'), ['X']); // and it starts over after its own last day
+  assert.equal(cycleSource(list).start, '2027-01-01'); // the list describes the one you loaded
+  assert.equal(cycleRanOut(list, '2026-12-31'), null);
+  assert.equal(cycleRanOut(list, '2027-01-02'), null);
+  assert.equal(cycleRanOut(list, '2027-01-03'), '2027-01-02');
+});
+
+test('the Anglican Cycle says when it has run out and started over, until a newer one is built in or loaded', () => {
+  const state = defaultState();
+  const list = state.lists.find((l) => l.id === 'anglican');
+  const ranOut = (k) => agenda(state, k).find((g) => g.list.id === 'anglican').ranOut;
+  assert.equal(ranOut('2026-12-31'), null);
+  assert.equal(ranOut('2027-01-01'), '2026-12-31');
+  assert.equal(ranOut('2027-06-30'), '2026-12-31');
+  BUNDLES.acp.push({ id: 'acp2027', start: '2027-01-01', entries: [{ text: 'X' }, { text: 'Y' }] });
+  try {
+    assert.equal(ranOut('2027-01-01'), null);
+    assert.equal(cycleRanOut(list, '2027-01-03'), '2027-01-02');
+  } finally {
+    BUNDLES.acp.pop();
+  }
+  // Only the Anglican Cycle: a cycle of your own just starts over.
+  const store = new Store(memoryStorage());
+  const psalms = store.addList({ name: 'Psalms', type: 'cycle' });
+  store.replaceCycle(psalms.id, { start: '2026-11-01', entries: [{ text: 'Psalm 1', seq: 0 }] });
+  assert.equal(cycleRanOut(store.list(psalms.id), '2026-11-05'), null);
+});
+
+test('a newer built-in edition takes over from a cycle you loaded, on its own first day', () => {
+  const store = new Store(memoryStorage());
+  store.replaceCycle('anglican', { start: '2026-11-01', entries: [{ text: 'Mine', seq: 0 }] });
+  BUNDLES.acp.push({ id: 'acp2027', start: '2027-01-01', entries: [{ text: 'X' }, { text: 'Y' }] });
+  try {
+    const on = (k) => itemsDue(store.list('anglican'), k).map((e) => e.text);
+    assert.deepEqual(on('2026-10-31'), ['The Diocese of North Eastern Caribbean and Aruba']); // before yours begins
+    assert.deepEqual(on('2026-12-15'), ['Mine']);
+    assert.deepEqual(on('2027-01-01'), ['X']);
+    // The same edition, loaded yourself: yours is the one used.
+    store.replaceCycle('anglican', { start: '2027-01-01', entries: [{ text: 'Mine too', seq: 0 }] });
+    assert.deepEqual(on('2027-01-01'), ['Mine too']);
   } finally {
     BUNDLES.acp.pop();
   }

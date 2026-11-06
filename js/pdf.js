@@ -2,6 +2,8 @@
 // go through the same parser as pasted text. pdf.js is only loaded when a PDF
 // is actually chosen.
 
+import { readPdfLines, parseAcpLines, everyDay } from './acp-pdf.js';
+
 let loading = null;
 
 function loadPdfjs() {
@@ -38,6 +40,17 @@ export async function pdfToText(file, onProgress) {
     await task.destroy();
   }
   return pages.join('\n');
+}
+
+/**
+ * The Anglican Cycle of Prayer, read from the Anglican Communion's PDF by its
+ * layout (as the built-in cycle is): every day from the first to the last,
+ * as { date, text, note? }, or [] when the PDF isn't laid out like one.
+ */
+export async function readAcpPdf(file, onProgress) {
+  const pdfjs = await loadPdfjs();
+  const { lines, fontsKnown } = await readPdfLines(pdfjs, new Uint8Array(await file.arrayBuffer()), onProgress);
+  return fontsKnown ? everyDay(parseAcpLines(lines)) : [];
 }
 
 /**

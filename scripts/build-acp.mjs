@@ -12,8 +12,9 @@
 
 import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { matchDateLine, parseDated } from '../js/importer.js';
-import { addDays, diffDays, keyFromParts } from '../js/dates.js';
+import { parseDated } from '../js/importer.js';
+import { addDays, diffDays } from '../js/dates.js';
+import { readPdfLines, parseAcpLines } from '../js/acp-pdf.js';
 
 const args = process.argv.slice(2);
 const opt = (name, fallback) => {
@@ -31,87 +32,11 @@ if (!pdfPath) {
 const pdfjs = await import('../vendor/pdfjs/pdf.min.mjs');
 pdfjs.GlobalWorkerOptions.workerSrc = new URL('../vendor/pdfjs/pdf.worker.min.mjs', import.meta.url).href;
 
-/** Every line of the PDF in reading order, marked bold or not. */
-async function readLines(path) {
-  const data = new Uint8Array(await readFile(path));
-  const task = pdfjs.getDocument({ data, isEvalSupported: false, fontExtraProperties: true, verbosity: 0 });
-  const doc = await task.promise;
-  const lines = [];
-  let fontsKnown = false;
-  for (let p = 1; p <= doc.numPages; p++) {
-    const page = await doc.getPage(p);
-    await page.getOperatorList(); // loads the fonts, so their names can be read
-    const tc = await page.getTextContent();
-    const names = new Map();
-    const fontOf = (id) => {
-      if (!names.has(id)) {
-        let n = '';
-        try { n = page.commonObjs.get(id)?.name || ''; } catch { n = ''; }
-        names.set(id, n);
-        if (n) fontsKnown = true;
-      }
-      return names.get(id);
-    };
-    let parts = [];
-    let bold = 0;
-    let chars = 0;
-    let lastY = null;
-    const flush = () => {
-      const text = parts.join('').replace(/\s+/g, ' ').trim();
-      if (text) lines.push({ text, bold: bold > chars / 2, page: p });
-      parts = [];
-      bold = 0;
-      chars = 0;
-    };
-    for (const it of tc.items) {
-      if (typeof it.str !== 'string') continue;
-      const y = it.transform[5];
-      const size = Math.abs(it.transform[3]) || 10;
-      if (lastY != null && Math.abs(y - lastY) > size * 0.6) flush();
-      const prev = parts[parts.length - 1];
-      // Separate runs that the PDF placed side by side without a space.
-      if (prev && it.str && !/\s$/.test(prev) && !/^\s/.test(it.str)) parts.push(' ');
-      parts.push(it.str);
-      const n = it.str.trim().length;
-      if (n) {
-        chars += n;
-        const f = fontOf(it.fontName);
-        if (/Bold/i.test(f) && !/Italic|Black/i.test(f)) bold += n;
-        lastY = y;
-      }
-      if (it.hasEOL) flush();
-    }
-    flush();
-    page.cleanup();
-  }
-  await task.destroy();
-  return { lines, fontsKnown };
-}
-
-const { lines, fontsKnown } = await readLines(pdfPath);
+const { lines, fontsKnown } = await readPdfLines(pdfjs, new Uint8Array(await readFile(pdfPath)));
 
 let entries;
 if (fontsKnown) {
-  entries = [];
-  let day = null;
-  for (const line of lines) {
-    const dm = line.bold && matchDateLine(line.text);
-    if (dm && dm.y && !dm.rest) {
-      day = { date: keyFromParts(dm.y, dm.m, dm.d), parts: [], closed: false };
-      entries.push(day);
-    } else if (day && line.bold && !day.closed) {
-      day.parts.push(line.text);
-    } else if (day && !line.bold && day.parts.length) {
-      // The entry is the bold run after the labels; anything later (a heading,
-      // a footer, a note about the next edition) is not part of it.
-      day.closed = true;
-    }
-  }
-  entries = entries.filter((d) => d.parts.length).map((d) => {
-    const full = d.parts.join(' ').replace(/\s+/g, ' ').replace(/\s*–\s*/g, ' – ').trim().replace(/\s*–$/, '');
-    const cut = full.indexOf(' – ');
-    return cut > 0 ? { date: d.date, text: full.slice(0, cut), note: full.slice(cut + 3) } : { date: d.date, text: full };
-  });
+  entries = parseAcpLines(lines);
 } else {
   // Fonts unavailable: fall back to the general dated-text reader.
   entries = parseDated(lines.map((l) => l.text).join('\n'), { defaultYear: 2023 }).entries;

@@ -12,7 +12,7 @@ import { canReach } from './reach.js';
 import { parseList, parseWeekly, parseMonthly, parseDated } from './importer.js';
 import { parseName, compareNames } from './names.js';
 import { WEEKDAYS, WEEKDAYS_SHORT, addDays, diffDays, formatShort, formatMedium, formatWithYear, weekday, parseKey, isValidKey, todayKey } from './dates.js';
-import { isPdf, pdfToText } from './pdf.js';
+import { isPdf, pdfToText, readAcpPdf } from './pdf.js';
 
 /** Where the Anglican Communion publishes each edition of the cycle (as its PDF says). */
 export const ACP_URL = 'https://www.anglicancommunion.org/prayer';
@@ -568,6 +568,8 @@ export function openImportSheet(app, listId) {
   let looseDay = list.type === 'weekly' ? (nonEmpty ? suggestWeekday(list, '', app.viewDate) : 'spread') : null;
   let spreadDays = spreadDaysFor(list);
   let parsed = { entries: [] };
+  // The Anglican Cycle read from its PDF by layout, kept as read for as long as its text is left as shown.
+  let fromPdf = null;
 
   const textarea = h('textarea', {
     class: 'input import-text',
@@ -596,8 +598,25 @@ export function openImportSheet(app, listId) {
       status.hidden = false;
       status.textContent = `Reading ${file.name}…`;
       submit.disabled = true;
+      const progress = (page, pages) => { status.textContent = `Reading page ${page} of ${pages}…`; };
+      fromPdf = null;
+      if (isAcp) {
+        try {
+          const days = await readAcpPdf(file, progress);
+          if (days.length) {
+            const text = days.map((d) => [d.date, d.text, d.note].filter(Boolean).join('\n')).join('\n');
+            fromPdf = { text, parsed: { entries: days, first: days[0].date, last: days[days.length - 1].date } };
+            textarea.value = text;
+            status.hidden = true;
+            update();
+            return;
+          }
+        } catch (err) {
+          console.error(err);
+        }
+      }
       try {
-        textarea.value = await pdfToText(file, (page, pages) => { status.textContent = `Reading page ${page} of ${pages}…`; });
+        textarea.value = await pdfToText(file, progress);
         status.hidden = true;
       } catch (err) {
         console.error(err);
@@ -611,6 +630,7 @@ export function openImportSheet(app, listId) {
   function parse() {
     const raw = textarea.value;
     if (!raw.trim()) return { entries: [] };
+    if (fromPdf && raw === fromPdf.text) return fromPdf.parsed;
     if (list.type === 'weekly') return parseWeekly(raw);
     if (list.type === 'monthly') return parseMonthly(raw);
     if (list.type === 'dated' || isCycle) return parseDated(raw, { defaultYear: parseKey(app.today).y });
@@ -703,7 +723,7 @@ export function openImportSheet(app, listId) {
         : 'Download the cycle’s PDF from ',
       h('a', { href: ACP_URL, target: '_blank', rel: 'noopener' }, 'anglicancommunion.org'),
       ' and choose it below, or copy its text and paste it here.',
-      hasBuiltin ? ' It takes the place of the built-in cycle; you can switch back in the list’s settings.' : ''),
+      hasBuiltin ? ' It takes over from the built-in cycle on the day it begins, so you can load it as soon as it’s out; you can switch back in the list’s settings.' : ''),
     textarea,
     h('div', { class: 'import-tools' },
       h('button', { type: 'button', class: 'btn btn-sm', onclick: () => pasteFromClipboard() }, icon('paste'), 'Paste'),

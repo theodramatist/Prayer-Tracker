@@ -426,9 +426,10 @@ await step('Anglican Cycle: paste dated text; today shows its diocese and bishop
   await page.locator('.view').screenshot({ path: `${OUT}07-today-full-page.png` });
 });
 
-await step('Anglican Cycle: after its last day the cycle starts over', async () => {
+await step('Anglican Cycle: after its last day the cycle starts over, and says so', async () => {
   await page.evaluate(() => window.prayerTracker.setDate('2026-11-05'));
   assert.deepEqual(await texts('.group[data-list=anglican] .item-text'), ['Pray for the Church of the Province of Example']);
+  assert.deepEqual(await texts('.group[data-list=anglican] .group-note p'), ['This cycle ended on Nov 4, 2026, and is starting over.']);
   assert.equal(await page.locator('.notice-card').count(), 0);
   await page.click('.back-today');
 });
@@ -447,7 +448,7 @@ await step('Anglican Cycle: read straight from a PDF', async () => {
   await pdfPage.close();
 
   await openList('anglican');
-  await page.locator('.toolbar button', { hasText: 'Add the cycle' }).click();
+  await page.locator('.toolbar button', { hasText: 'Load a newer cycle' }).click();
   const sheet = page.locator('.sheet-import');
   await sheet.waitFor();
   await sheet.locator('input[type=file]').setInputFiles(pdfPath);
@@ -1364,10 +1365,68 @@ await step('the two editions keep their data apart, and both offline copies stay
 await step('public: the page of instructions for getting it on a phone', async () => {
   await page.goto(`${PUBLIC}install.html`);
   assert.match(await page.locator('main').innerText(), /Add to Home Screen[\s\S]*Install app[\s\S]*stays on your phone/);
+  assert.match(await page.locator('main').innerText(), /When the new Anglican Cycle comes out[\s\S]*runs to December 31, 2026[\s\S]*Load a newer cycle[\s\S]*Choose a file \(PDF or text\)[\s\S]*Use these … days/);
   assert.match(await page.locator('#address').innerText(), /everyone\/$/);
   await shot('51-public-install-page');
   await page.locator('a.open').click();
   await page.locator('.day-head h1').waitFor();
+});
+
+await step('public: when the Anglican Cycle runs out it says so; a new one loaded early begins on its first day', async () => {
+  // January 1, 2027, with no newer cycle: the old one starts over, and Today and the list say so.
+  // (Days missed since November come along under them too, as From earlier days.)
+  await page.clock.setFixedTime(new Date('2027-01-01T09:00:00-05:00'));
+  await page.goto(PUBLIC);
+  await page.locator('.day-head h1').waitFor();
+  assert.deepEqual(await texts('.group[data-list=anglican] > ul.items .item-text'), ['The Diocese of Zaki-Biam']);
+  assert.deepEqual(await texts('.group[data-list=anglican] .group-note p'), ['This cycle ended on Dec 31, 2026, and is starting over.']);
+  await page.locator('.group[data-list=anglican]').screenshot({ path: `${OUT}52-public-cycle-ran-out.png` });
+  await page.goto(`${PUBLIC}#/list/anglican`);
+  await page.locator('.list-title h1').waitFor();
+  assert.match(await page.locator('.notice-card').innerText(), /^This cycle ended on Dec 31, 2026, and is starting over until the new one is loaded\.[\s\S]*anglicancommunion\.org[\s\S]*Load a newer cycle/);
+  await shot('53-public-cycle-ran-out-list');
+
+  // December 30, and the new cycle is out: load it as the instructions say.
+  await page.clock.setFixedTime(new Date('2026-12-30T09:00:00-05:00'));
+  await page.reload(); // the same address, so a reload to start the app on the new day
+  await page.locator('.list-title h1').waitFor();
+  assert.equal(await page.locator('.notice-card').count(), 0);
+  const pdfPage = await context3.newPage();
+  const days = [['Friday 1 January 2027', 'The Naming and Circumcision of Jesus', 'The Diocese of Alpha (Example) – The Church of', 'Example (Anglican Communion)'],
+    ['Saturday 2 January 2027', '', 'The Diocese of Beta (Example) – The Province of Example', ''],
+    ['Sunday 3 January 2027', 'Christmas 2', 'The Church of the Province of Example', '']];
+  await pdfPage.setContent(`<style>body{font:13px Georgia,serif;margin:30px} .cols{columns:3} p{margin:0} b{display:block;margin-top:10px} i{display:block;font-weight:300}</style>
+    <p>The Anglican Cycle of Prayer: From Alpha to Omega – 1 January 2027 to 3 January 2027</p><p>January 2027</p>
+    <div class="cols">${days.map(([d, label, a, b]) => `<b>${d}</b>${label ? `<i>${label}</i>` : ''}<p><strong>${a}</strong></p>${b ? `<p><strong>${b}</strong></p>` : ''}`).join('')}</div>
+    <p>www.anglicancommunion.org 1</p>`);
+  const pdfPath = `${OUT}acp-2027-sample.pdf`;
+  await pdfPage.pdf({ path: pdfPath, format: 'A4' });
+  await pdfPage.close();
+  await page.locator('.toolbar button', { hasText: 'Load a newer cycle' }).click();
+  const sheet = page.locator('.sheet-import');
+  await sheet.waitFor();
+  assert.match(await sheet.innerText(), /It takes over from the built-in cycle on the day it begins/);
+  await sheet.locator('input[type=file]').setInputFiles(pdfPath);
+  await eventually(async () => assert.equal(await sheet.locator('.preview-summary').innerText(), '3 days, Jan 1, 2027 to Jan 3, 2027, then it starts over'), 15000);
+  assert.deepEqual((await texts('.sheet-import .preview-list li')).map((t) => t.split('\n')), [
+    ['Fri, Jan 1', 'The Diocese of Alpha (Example)', 'The Church of Example (Anglican Communion)'],
+    ['Sat, Jan 2', 'The Diocese of Beta (Example)', 'The Province of Example'],
+    ['Sun, Jan 3', 'The Church of the Province of Example'],
+  ]);
+  assert.match(await sheet.locator('button[type=submit]').innerText(), /^Use these 3 days/);
+  await shot('54-public-load-newer-cycle');
+  await sheet.locator('button[type=submit]').click();
+  await sheet.waitFor({ state: 'detached' });
+  assert.match(await page.locator('.list-sub').innerText(), /3 days from Jan 1, 2027, then it starts over/);
+  // Until then, the built-in cycle's last days; then the new one, from its first.
+  assert.deepEqual((await texts('.detail-body .row-text')).slice(0, 4), ['The Diocese of San Diego', 'The Diocese of Divine Hope', 'The Diocese of Alpha (Example)', 'The Diocese of Beta (Example)']);
+  await page.goto(PUBLIC);
+  await page.locator('.day-head h1').waitFor();
+  assert.deepEqual(await texts('.group[data-list=anglican] > ul.items .item-text'), ['The Diocese of San Diego']);
+  await page.evaluate(() => window.prayerTracker.setDate('2027-01-01'));
+  assert.deepEqual(await texts('.group[data-list=anglican] > ul.items .item-text'), ['The Diocese of Alpha (Example)']);
+  assert.deepEqual(await texts('.group[data-list=anglican] > ul.items .item-note'), ['The Church of Example (Anglican Communion)']);
+  assert.equal(await page.locator('.group[data-list=anglican] .group-note').count(), 0);
 });
 
 await step('no errors in the console (part 3)', async () => {
@@ -1431,6 +1490,7 @@ await step('the editions keep their data apart, and each has its page of instruc
     await page.goto(`${BASE}${ed}/install.html`);
     assert.match(await page.locator('#address').innerText(), new RegExp(`${ed}/$`));
     assert.match(await page.locator('main').innerText(), /Lesser Feasts and Fasts[\s\S]*Choose the PDF/);
+    assert.match(await page.locator('main').innerText(), /When the new Anglican Cycle comes out[\s\S]*Load a newer cycle/);
   }
   assert.match(await page.locator('main').innerText(), /To take your own name off:/);
   await shot('62-eastern-ridges-install');

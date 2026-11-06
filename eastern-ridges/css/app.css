@@ -468,6 +468,10 @@ code { font: 0.92em/1 ui-monospace, "SF Mono", Menlo, monospace; padding: 1px 5p
 }
 .group-head h2 { font-size: 22px; line-height: 1.2; min-width: 0; }
 .group-label { color: var(--accent); white-space: nowrap; }
+/* Under a list's heading: the Anglican Cycle has run out and is starting over. */
+.group-note { display: flex; flex-wrap: wrap; align-items: center; column-gap: 10px; margin: -4px 4px 8px; }
+.group-note p { color: var(--text-2); font-size: 14.5px; text-wrap: pretty; }
+.group-note .link-btn { font-size: 14.5px; min-height: 32px; padding: 4px 0; }
 .group-count {
   margin-left: auto;
   min-width: 26px; height: 22px;
@@ -773,6 +777,7 @@ code { font: 0.92em/1 ui-monospace, "SF Mono", Menlo, monospace; padding: 1px 5p
 .setup-actions, .banner-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
 .notice-card { background: var(--warn-bg); }
 .notice-card p { color: var(--warn-text); }
+.notice-card p + p { margin-top: 8px; }
 .banner { background: var(--surface); box-shadow: var(--shadow); border: 1px solid var(--line); border-left: 4px solid var(--accent); }
 .banner-warn { background: var(--warn-bg); border-color: transparent; border-left-color: var(--warn-text); }
 .banner-warn p { color: var(--warn-text); }

@@ -2,7 +2,7 @@
 // pasted in, edited and (for weekly lists) spread over the week.
 
 import { h, icon, toast, plural, noteParts } from './ui.js';
-import { LIST_TYPES, SORTS, sortItems, partitionByStatus, endLabel, datedRange, cycleSource, itemsDue, builtinEntries } from './schedule.js';
+import { LIST_TYPES, SORTS, sortItems, partitionByStatus, endLabel, datedRange, cycleSource, ownCycle, cycleRanOut, itemsDue, builtinEntries } from './schedule.js';
 import { WEEKDAYS, MONTHS, addDays, formatMedium, formatWithYear, formatShort, parseKey } from './dates.js';
 import { editionById } from './bundles.js';
 import { openAddSheet, openItemSheet, openImportSheet, openListSheet, openDistributeSheet, openPrayerPicker, loadSeed, ACP_URL } from './sheets.js';
@@ -33,7 +33,7 @@ function summary(list, today) {
       break;
     }
     case 'cycle': {
-      const src = cycleSource(list, today);
+      const src = ownCycle(list) || cycleSource(list, today);
       text = src ? `Cycle · ${plural(src.length, 'day')}${src.builtin ? ' · built in' : ''}` : 'Cycle · nothing added yet';
       break;
     }
@@ -169,7 +169,8 @@ export function renderListDetail(app, id) {
       oninput: (e) => filterRows(e.target.value),
     }));
 
-  const src = cycleSource(list, app.today);
+  // A cycle you have loaded is the one described, even before the day it begins.
+  const src = ownCycle(list) || cycleSource(list, app.today);
   const sub = list.type === 'cycle'
     ? [LIST_TYPES.cycle.label, src ? `${plural(src.length, 'day')} from ${formatWithYear(src.start)}, then it starts over` : 'nothing added yet']
     : [LIST_TYPES[list.type].label, `ordered by ${SORTS[list.sort].toLowerCase()}`];
@@ -190,7 +191,7 @@ export function renderListDetail(app, id) {
     : h('div', { class: 'toolbar' },
       list.type !== 'dated' && list.type !== 'cycle' && h('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: () => openAddSheet(app, { listId: list.id }) }, icon('plus'), 'Add'),
       h('button', { class: 'btn btn-sm', type: 'button', onclick: () => openImportSheet(app, list.id) }, icon('paste'),
-        list.type === 'cycle' ? (src?.builtin ? 'Load a newer cycle' : 'Add the cycle') : list.type === 'dated' ? 'Add dates' : 'Paste a list'),
+        list.type === 'cycle' ? (src ? 'Load a newer cycle' : 'Add the cycle') : list.type === 'dated' ? 'Add dates' : 'Paste a list'),
       list.type === 'weekly' && list.items.length > 1 && h('button', { class: 'btn btn-sm', type: 'button', onclick: () => openDistributeSheet(app, list.id) }, icon('spread'), 'Spread over the week'),
       list.kind === 'acp' && h('a', { class: 'btn btn-sm', href: ACP_URL, target: '_blank', rel: 'noopener' }, icon('link'), 'anglicancommunion.org'),
       list.hidden && h('button', { class: 'btn btn-sm', type: 'button', onclick: () => store.updateList(list.id, { hidden: false }) }, 'Show on Today')),
@@ -230,6 +231,7 @@ function cycleBody(app, list) {
   const src = cycleSource(list, app.today);
   if (!src) return [emptyState(app, list)];
   const days = app.cycleDays || 30;
+  const ended = cycleRanOut(list, app.today);
   const rows = [];
   for (let k = 0; k < days; k++) {
     const date = addDays(app.today, k);
@@ -238,6 +240,12 @@ function cycleBody(app, list) {
     }
   }
   const out = [section('Coming days', rows, { count: false, className: 'dated' })];
+  // The Anglican Cycle, run out and starting over: what to do when the new one is published.
+  if (ended) {
+    out.unshift(h('section', { class: 'notice-card' },
+      h('p', null, h('strong', null, `This cycle ended on ${formatWithYear(ended)}`), ', and is starting over until the new one is loaded.'),
+      h('p', null, 'When the Anglican Communion publishes it, download its PDF from anglicancommunion.org (on an iPhone, tap Share, then Save to Files). Then tap Load a newer cycle above and choose it.')));
+  }
   if (days < src.length) {
     out.push(h('button', {
       class: 'btn btn-quiet btn-sm',

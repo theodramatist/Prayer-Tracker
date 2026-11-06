@@ -82,19 +82,43 @@ export function sortItems(list, items) {
   return arr;
 }
 
+/** A cycle you have loaded into a list yourself (each entry with a `seq`, the day number from `start`), or null. */
+export function ownCycle(list) {
+  if (list.type !== 'cycle' || !list.items.length) return null;
+  let length = 0;
+  for (const i of list.items) length = Math.max(length, (i.seq ?? 0) + 1);
+  return { start: list.start || list.since, length, builtin: false };
+}
+
 /**
- * Where a cycle list's days come from: its own entries (each with a `seq`, the
- * day number from `start`), or else a built-in cycle such as the Anglican Cycle.
+ * Where a cycle list's days come from on dateKey: a cycle you have loaded, or
+ * a built-in one such as the Anglican Cycle. One you load (a newer Anglican
+ * Cycle, say) takes over from the built-in cycle on the day it begins, so it
+ * can be loaded as soon as it is published; a newer built-in edition takes
+ * over from it in turn on its own first day. With no date, your own cycle.
  */
 export function cycleSource(list, dateKey = null) {
   if (list.type !== 'cycle') return null;
-  if (list.items.length) {
-    let length = 0;
-    for (const i of list.items) length = Math.max(length, (i.seq ?? 0) + 1);
-    return { start: list.start || list.since, length, builtin: false };
-  }
+  const own = ownCycle(list);
   const bundle = bundleFor(list, dateKey);
-  return bundle ? { start: bundle.start, length: bundle.entries.length, builtin: true, bundle } : null;
+  const built = bundle ? { start: bundle.start, length: bundle.entries.length, builtin: true, bundle } : null;
+  if (!own || !built || !dateKey) return own || built;
+  if (dateKey < own.start) return built;
+  return built.start > own.start && dateKey >= built.start ? built : own;
+}
+
+/** The last day of a cycle source. */
+export const cycleEnd = (src) => addDays(src.start, src.length - 1);
+
+/**
+ * For the Anglican Cycle: the last day of the cycle in use on dateKey, once
+ * that day has passed and the cycle has started over (no newer one loaded or
+ * built in yet), or null.
+ */
+export function cycleRanOut(list, dateKey) {
+  if (list.type !== 'cycle' || list.kind !== 'acp') return null;
+  const src = cycleSource(list, dateKey);
+  return src && diffDays(src.start, dateKey) >= src.length ? cycleEnd(src) : null;
 }
 
 /** Day `index` of a cycle that began on `start` (wrapping in both directions). */
@@ -237,7 +261,7 @@ export function carriedOver(state, today, isChecked, { lookback = 60 } = {}) {
 
 /**
  * Everything due on dateKey, grouped by list (in the lists' order).
- * Hidden lists are skipped. Each group: { list, items, carried, label, needsSetup, cycleEnded }.
+ * Hidden lists are skipped. Each group: { list, items, carried, label, needsSetup, cycleEnded, ranOut }.
  */
 export function agenda(state, dateKey, { carried = null } = {}) {
   const opts = { foldShortMonths: state.settings?.foldShortMonths !== false };
@@ -252,6 +276,7 @@ export function agenda(state, dateKey, { carried = null } = {}) {
       label: cycleLabel(list, dateKey, opts),
       needsSetup: false,
       cycleEnded: false,
+      ranOut: cycleRanOut(list, dateKey),
     };
     if (entryCount(list) === 0 && list.type !== 'daily') group.needsSetup = true;
     if (list.type === 'dated' && items.length === 0 && list.items.length) {

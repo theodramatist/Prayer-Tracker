@@ -266,6 +266,7 @@ function groupSection(app, g, model) {
         class: `group-count ${complete ? 'all-done' : ''}`,
         'aria-label': complete ? 'all prayed' : `${pending.length + g.carried.length} to pray`,
       }, complete ? icon('check') : String(pending.length + g.carried.length))),
+    g.ranOut && ranOutNote(app, g),
     !complete && prayerBlock(app, g.list),
     pending.length > 0 && h('ul', { class: 'items' }, pending.map((i) => itemRow(app, g.list, i, false))),
     pending.length >= 3 && allPrayed(app, pending, model.date),
@@ -469,6 +470,13 @@ function setupCard(app, list) {
           });
         },
       }, 'Not now')));
+}
+
+/** The Anglican Cycle, once its cycle has run out and started over: say so, with a way to load the new one. */
+function ranOutNote(app, g) {
+  return h('div', { class: 'group-note' },
+    h('p', null, `This cycle ended on ${formatWithYear(g.ranOut)}, and is starting over.`),
+    h('button', { class: 'link-btn', type: 'button', onclick: () => openImportSheet(app, g.list.id) }, icon('paste'), 'Load the new one'));
 }
 
 function cycleEndedCard(app, list) {

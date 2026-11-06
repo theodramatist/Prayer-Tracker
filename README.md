@@ -148,12 +148,21 @@ That is exactly 174 weeks, so if no newer edition has been added, it starts over
 
 - If a diocese has merged or been renamed, tap it and change the wording; the original
   is kept underneath so you can restore it. Your edits are listed on the list's page.
-- **Lists → Anglican Cycle of Prayer → Load a newer cycle** can also read a new
-  edition's PDF on your device.
+- **Lists → Anglican Cycle of Prayer → Load a newer cycle** reads a new edition's PDF
+  on your device, by its layout, exactly as the builder below does (the same code, in
+  `js/acp-pdf.js`): loading the current PDF that way gives all 1,218 days word for word
+  as built in. A cycle you load takes over on the day it begins, so it can be loaded as
+  soon as it is published; until then the built-in cycle goes on. A newer built-in
+  edition takes over from it in turn, on its own first day. **Switch back to the
+  built-in cycle**, in the list's settings, removes yours.
+- Once the cycle in use has run out and started over, Today says so under the Anglican
+  Cycle of Prayer, with **Load the new one**, and the list's page says what to do. The
+  instructions pages for the editions say the same (*When the new Anglican Cycle comes
+  out*).
 
 **Adding the next edition to the app.** The PDF says the next edition, from 1 January
-2027, is available at [anglicancommunion.org/prayer](https://www.anglicancommunion.org/prayer).
-Build it with
+2027, would be available at [anglicancommunion.org/prayer](https://www.anglicancommunion.org/prayer)
+(as of November 2026 it isn't yet). Build it with
 
 ```
 node scripts/build-acp.mjs path/to/the-2027-edition.pdf --title "…" --out js/data/acp-2027.js
@@ -394,7 +403,8 @@ Layout: `index.html`, `css/app.css`, and ES modules in `js/`:
   places those pages differ settled by the complete Prayer Book. `bundles.js` and `data/acp.js` hold the built-in
   Anglican Cycle; `seeds.js` and `data/diocese.js` hold the diocese's cycles,
   which are copied into their lists on first run (`scripts/build-diocese.mjs` builds them).
-- `importer.js` reads pasted text and `pdf.js` reads PDFs; `names.js` handles
+- `importer.js` reads pasted text and `pdf.js` reads PDFs, the Anglican Cycle's by its
+  layout with `acp-pdf.js` (shared with `scripts/build-acp.mjs`); `names.js` handles
   last-name sorting.
 - `store.js` handles storage, with per-entry timestamps and tombstones; `sync.js`
   handles the merge and the GitHub file.
