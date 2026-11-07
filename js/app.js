@@ -20,7 +20,10 @@ const root = document.documentElement;
 const view = document.getElementById('view');
 
 const store = new Store();
-for (const seed of SEEDS) store.seed(seed); // first run on this device: the built-in cycles (full edition)
+for (const seed of SEEDS) {
+  store.seed(seed); // first run on this device: the built-in cycles
+  store.reviseSeed(seed); // and since then, any changes to them
+}
 const lff = new LffLibrary(store.storage);
 const sync = new SyncManager(store, { library: lff });
 

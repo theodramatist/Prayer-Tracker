@@ -8,6 +8,10 @@
 //   month includes every church; companion churches and diocese-wide petitions
 //   take days 29–31 (which fold into the last day of a shorter month).
 // - The daily clergy cycle itself, one entry per date, read from its PDF.
+// - With the changes since the diocese published them (CHANGES below). Each
+//   changed entry carries `was`, how it read before, and `updated`, so phones
+//   that copied the cycles earlier take the change up (see store.reviseSeed),
+//   wherever their copy still reads as it did.
 
 import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -100,6 +104,23 @@ const PLACE = {
 };
 const BENEFICE = /northern highlands? benefice/;
 
+// ---------- changes since the diocese published its 2026 cycle ----------
+// As reported in November 2026. MOVED gives a listing in the daily cycle as
+// printed (`was`) and as it is now (`now`; null when the post has ended,
+// leaving just the name), so the monthly cycle follows it. ADDED puts clergy
+// the daily cycle doesn't name at their church in the monthly cycle.
+const REVISED = Date.parse('2026-11-07T00:00:00Z');
+const MOVED = [
+  { name: 'Mike Hackbarth', was: 'Deacon, St. Paul’s Cathedral, Fond du Lac', now: 'Vicar, St. John’s, New London' },
+  { name: 'Micah Cronin', was: 'Supply, St. Luke’s, Madison', now: 'Dean, All Saints Cathedral, Milwaukee' },
+  { name: 'Christopher Wilkerson', was: 'Rector, All Saints, Appleton', now: null },
+  { name: 'Portia Corbin', was: 'Priest-in-Charge, St. John’s, New London', now: null },
+  { name: 'John Allen', was: 'Supply, All Saints Cathedral, Milwaukee', now: null },
+];
+const ADDED = [
+  { name: 'Cam Walker', role: 'Priest-in-Charge', church: 'All Saints, Appleton' },
+];
+
 // ---------- matching ----------
 
 const norm = (s) => String(s).toLowerCase().replace(/[’']/g, '').replace(/\bsaint\b/g, 'st').replace(/\bsts\b/g, 'st')
@@ -115,78 +136,118 @@ const rank = (role) => {
 };
 
 const text = await pdfToText(new File([await readFile(pdfPath)], 'daily.pdf', { type: 'application/pdf' }));
-const daily = parseDated(text, { defaultYear: 2026 }).entries;
+const printed = parseDated(text, { defaultYear: 2026 }).entries;
 
-// Churches and other entries in Sunday order, merging repeats.
-const entries = [];
-for (const [sunday, items] of SUNDAYS) {
-  for (const it of items) {
-    if (it.kind === 'parish') entries.push({ ...it, sunday, text: `${it.name}, ${it.town}`, clergy: [] });
-    else if (it.kind === 'extra' && it.merge == null) entries.push({ ...it, sunday, clergy: [] });
-  }
-}
-const parishes = entries.filter((e) => e.kind === 'parish');
-const extras = entries.filter((e) => e.kind === 'extra');
-
-const placed = new Set();
-const unplaced = [];
-for (const d of daily) {
-  if (!d.note) continue;
-  const role = d.note.split(',')[0].trim();
-  const hay = norm(d.note);
-  const hayAll = norm(`${d.text} ${d.note}`); // "Hilary Crupi, OJN": the order is in the name
-  let targets = [];
-  if (PLACE[d.date]) targets = entries.filter((e) => e.text === PLACE[d.date].church);
-  else if (BENEFICE.test(hay)) targets = parishes.filter((e) => e.benefice);
-  else {
-    targets = entries.filter((e) => {
-      if (e.match) return e.match.test(hayAll);
-      if (e.kind !== 'parish') return false;
-      return pattern(e.name, e.town).test(hay);
-    });
-  }
-  if (!targets.length) {
-    // Listed with a place (beyond "canonically resident") that isn't in the Sunday cycle.
-    const place = d.note.split(',').slice(1).join(',').trim();
-    if (place && !/^canonically resident$/i.test(place) && /rector|priest-in-charge|deacon|supply|associate|assisting|dean|interim|chaplain/i.test(role)) unplaced.push(d);
-    continue;
-  }
-  for (const t of targets) {
-    t.clergy.push({ name: d.text, role, date: d.date, benefice: BENEFICE.test(hay), corrected: PLACE[d.date]?.why });
-  }
-  placed.add(d.date);
+/** The daily cycle with MOVED applied; each change must match exactly one listing. */
+function revise(list) {
+  const out = list.map((d) => {
+    const m = MOVED.find((x) => x.name === d.text && x.was === d.note);
+    if (!m) return d;
+    m.found = (m.found || 0) + 1;
+    return m.now ? { ...d, note: m.now } : { date: d.date, text: d.text };
+  });
+  for (const m of MOVED) if (m.found !== 1) throw new Error(`build-diocese: found “${m.name}, ${m.was}” ${m.found || 0} times in the daily cycle`);
+  return out;
 }
 
-const clergyNote = (e) => {
-  const list = [...e.clergy]
-    .sort((a, b) => rank(a.role) - rank(b.role) || a.date.localeCompare(b.date))
-    .map((c) => `${c.name}, ${c.role}`)
-    .join(' · ');
-  return list && e.clergy.every((c) => c.benefice) ? `Northern Highlands Benefice: ${list}` : list;
-};
-
-// Spread the parishes evenly over days 1–28, keeping their order; the rest on 29–31.
-const monthly = [];
-const spread = (list, firstDay, days) => {
-  let start = 0;
-  for (let k = 0; k < days; k++) {
-    const end = start + Math.round((list.length - start) / (days - k));
-    for (const e of list.slice(start, end)) {
-      const note = clergyNote(e);
-      monthly.push(note ? { day: firstDay + k, text: e.text, note } : { day: firstDay + k, text: e.text });
+/** The monthly and daily cycles from a daily cycle, with any clergy to add. */
+function build(daily, added) {
+  // Churches and other entries in Sunday order, merging repeats.
+  const entries = [];
+  for (const [sunday, items] of SUNDAYS) {
+    for (const it of items) {
+      if (it.kind === 'parish') entries.push({ ...it, sunday, text: `${it.name}, ${it.town}`, clergy: [] });
+      else if (it.kind === 'extra' && it.merge == null) entries.push({ ...it, sunday, clergy: [] });
     }
-    start = end;
   }
-};
-spread(parishes, 1, 28);
-spread(extras, 29, 3);
+  const parishes = entries.filter((e) => e.kind === 'parish');
+  const extras = entries.filter((e) => e.kind === 'extra');
 
-// The daily cycle as printed, with the same corrections.
-const dailyOut = daily.map((d) => {
-  const fix = PLACE[d.date];
-  const note = fix?.printed && d.note ? d.note.replace(fix.printed, fix.church) : d.note;
-  return note ? { date: d.date, text: d.text, note } : { date: d.date, text: d.text };
-});
+  const placed = new Set();
+  const unplaced = [];
+  for (const d of daily) {
+    if (!d.note) continue;
+    const role = d.note.split(',')[0].trim();
+    const hay = norm(d.note);
+    const hayAll = norm(`${d.text} ${d.note}`); // "Hilary Crupi, OJN": the order is in the name
+    let targets = [];
+    if (PLACE[d.date]) targets = entries.filter((e) => e.text === PLACE[d.date].church);
+    else if (BENEFICE.test(hay)) targets = parishes.filter((e) => e.benefice);
+    else {
+      targets = entries.filter((e) => {
+        if (e.match) return e.match.test(hayAll);
+        if (e.kind !== 'parish') return false;
+        return pattern(e.name, e.town).test(hay);
+      });
+    }
+    if (!targets.length) {
+      // Listed with a place (beyond "canonically resident") that isn't in the Sunday cycle.
+      const place = d.note.split(',').slice(1).join(',').trim();
+      if (place && !/^canonically resident$/i.test(place) && /rector|priest-in-charge|deacon|supply|associate|assisting|dean|interim|chaplain/i.test(role)) unplaced.push(d);
+      continue;
+    }
+    for (const t of targets) {
+      t.clergy.push({ name: d.text, role, date: d.date, benefice: BENEFICE.test(hay), corrected: PLACE[d.date]?.why });
+    }
+    placed.add(d.date);
+  }
+  for (const a of added) {
+    const t = entries.find((e) => e.text === a.church);
+    if (!t) throw new Error(`build-diocese: no church “${a.church}” for ${a.name}`);
+    t.clergy.push({ name: a.name, role: a.role, date: '', benefice: false });
+  }
+
+  const clergyNote = (e) => {
+    const list = [...e.clergy]
+      .sort((a, b) => rank(a.role) - rank(b.role) || a.date.localeCompare(b.date))
+      .map((c) => `${c.name}, ${c.role}`)
+      .join(' · ');
+    return list && e.clergy.every((c) => c.benefice) ? `Northern Highlands Benefice: ${list}` : list;
+  };
+
+  // Spread the parishes evenly over days 1–28, keeping their order; the rest on 29–31.
+  const monthly = [];
+  const spread = (list, firstDay, days) => {
+    let start = 0;
+    for (let k = 0; k < days; k++) {
+      const end = start + Math.round((list.length - start) / (days - k));
+      for (const e of list.slice(start, end)) {
+        const note = clergyNote(e);
+        monthly.push(note ? { day: firstDay + k, text: e.text, note } : { day: firstDay + k, text: e.text });
+      }
+      start = end;
+    }
+  };
+  spread(parishes, 1, 28);
+  spread(extras, 29, 3);
+
+  // The daily cycle, with the same corrections of place.
+  const dailyOut = daily.map((d) => {
+    const fix = PLACE[d.date];
+    const note = fix?.printed && d.note ? d.note.replace(fix.printed, fix.church) : d.note;
+    return note ? { date: d.date, text: d.text, note } : { date: d.date, text: d.text };
+  });
+  return { parishes, extras, placed, unplaced, monthly, dailyOut };
+}
+
+const asPrinted = build(printed, []);
+const daily = revise(printed);
+const { parishes, extras, placed, unplaced, monthly, dailyOut } = build(daily, ADDED);
+
+/** Mark each entry that differs from the cycle as printed with how it read then. */
+const changes = [];
+function markChanges(now, then, label) {
+  now.forEach((e, k) => {
+    const was = {};
+    for (const f of ['text', 'note']) if ((e[f] ?? null) !== (then[k][f] ?? null)) was[f] = then[k][f] ?? null;
+    if (!Object.keys(was).length) return;
+    e.was = was;
+    e.updated = REVISED;
+    changes.push(`${label(e)}: ${then[k].note || '—'} → ${e.note || '—'}`);
+  });
+}
+markChanges(monthly, asPrinted.monthly, (e) => `Day ${e.day}, ${e.text}`);
+markChanges(dailyOut, asPrinted.dailyOut, (e) => `${e.date}, ${e.text}`);
 
 const data = {
   id: 'wis2026',
@@ -200,8 +261,10 @@ const data = {
 const rows = (arr) => arr.map((e) => `    ${JSON.stringify(e)},`).join('\n');
 await writeFile(out, `// The Episcopal Diocese of Wisconsin's cycles of prayer, built by
 // scripts/build-diocese.mjs from the diocese's 2026 Sunday-by-Sunday cycle and
-// its 2026 Daily Cycle of Prayer. On first use the app copies them into your
-// Diocesan Cycle and Diocesan Daily Cycle lists, where they can be edited.
+// its 2026 Daily Cycle of Prayer, with the changes since (each with \`was\`, how
+// it read before, and when it changed). On first use the app copies them into
+// your Diocesan Cycle and Diocesan Daily Cycle lists, where they can be edited;
+// a copy made earlier takes up each change wherever it still reads as it did.
 export default {
   id: ${JSON.stringify(data.id)},
   diocese: ${JSON.stringify(data.diocese)},
@@ -238,6 +301,8 @@ lines.push('', '## Daily-cycle entries to check', '');
 for (const d of blank) lines.push(`- ${d.date}: “${d.text}”`);
 lines.push('', '## Left out of the monthly cycle', '');
 for (const [sunday, items] of SUNDAYS) for (const it of items) if (it.kind === 'feast' || it.kind === 'seasonal') lines.push(`- ${sunday}: ${it.text} (${it.kind === 'feast' ? 'a feast, not a church' : 'seasonal'})`);
+lines.push('', '## Changes since the diocese published its cycles', '');
+for (const c of changes) lines.push(`- ${c}`);
 lines.push('', '## Spellings corrected from the Sunday cycle', '');
 for (const e of parishes.filter((x2) => x2.fix)) lines.push(`- ${e.fix} → ${e.text}`);
 const report = lines.join('\n');
@@ -246,4 +311,5 @@ if (reportPath) await writeFile(reportPath, `${report}\n`);
 console.log(`${parishes.length} churches + ${extras.length} others over 31 days; ${monthly.length} monthly entries; ${daily.length} daily entries.`);
 console.log(`Clergy placed from ${placed.size} daily entries; ${unplaced.length} listed with a church not in the Sunday cycle.`);
 console.log(`Churches without clergy: ${parishes.filter((e) => !e.clergy.length).map((e) => e.text).join('; ')}`);
+console.log(`Changed since the diocese published them: ${changes.length} entries.\n  ${changes.join('\n  ')}`);
 console.log(`Wrote ${out}${reportPath ? ` and ${reportPath}` : ''}`);

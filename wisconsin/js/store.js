@@ -24,10 +24,11 @@ export function uid() {
 
 function seedItem(seed, entry, k, today) {
   const item = {
-    id: `${SEED_PREFIX}${seed.id}-${entry.key}`,
+    id: seedItemId(seed, entry),
     text: entry.text,
     created: seed.updated + k,
-    updated: seed.updated,
+    // An entry changed since the cycle was first published carries when it changed.
+    updated: entry.updated ?? seed.updated,
     since: today,
   };
   if (entry.note) item.note = entry.note;
@@ -39,6 +40,14 @@ function seedItem(seed, entry, k, today) {
     item.last = entry.last;
   }
   return item;
+}
+
+const seedItemId = (seed, entry) => `${SEED_PREFIX}${seed.id}-${entry.key}`;
+
+/** Whether an item reads as a built-in entry did before it changed (`was` holds just what differed). */
+function readsAsBefore(item, entry) {
+  const before = { text: entry.text, note: entry.note ?? null, ...entry.was };
+  return item.text === before.text && (item.note ?? null) === (before.note ?? null);
 }
 
 export const LIST_TYPES = new Set(['daily', 'weekly', 'monthly', 'dated', 'cycle']);
@@ -575,6 +584,38 @@ export class Store {
       }
       s.meta.seeded = { ...(s.meta.seeded || {}), [seed.id]: this.clock() };
       return added;
+    });
+  }
+
+  /**
+   * Bring the entries copied from a built-in cycle up to date with it: each
+   * entry it has changed since (one with `was`, how it read before) changes
+   * here too, wherever this copy still reads as it did, so your own edits are
+   * kept, and nothing you deleted comes back. Every device makes the same
+   * change, with the same time, so they agree when they sync. Returns how
+   * many entries changed.
+   */
+  reviseSeed(seed) {
+    if (!this.state.meta.seeded?.[seed.id]) return 0;
+    const due = [];
+    for (const part of seed.lists) {
+      const list = this.list(part.list.id);
+      if (!list || list.type !== part.list.type) continue;
+      for (const entry of part.entries) {
+        if (!entry.was) continue;
+        const item = list.items.find((i) => i.id === seedItemId(seed, entry));
+        if (item && readsAsBefore(item, entry)) due.push({ item, entry });
+      }
+    }
+    if (!due.length) return 0;
+    return this.commit(() => {
+      for (const { item, entry } of due) {
+        item.text = entry.text;
+        if (entry.note) item.note = entry.note;
+        else delete item.note;
+        item.updated = Math.max(item.updated || 0, entry.updated ?? seed.updated);
+      }
+      return due.length;
     });
   }
 

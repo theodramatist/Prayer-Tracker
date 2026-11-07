@@ -1286,6 +1286,11 @@ await step('the full edition is installed first, with its offline copy', async (
 await step('the public edition opens at everyone/: the Anglican Cycle, your church, your own lists, the Collect of the Day', async () => {
   await page.goto(PUBLIC);
   await page.locator('.day-head h1').waitFor();
+  // Its own offline copy takes over from the full edition's as it opens, and the page reloads
+  // under it once; wait for that, so nothing typed afterwards is lost to the reload.
+  await eventually(async () => assert.ok(await page.evaluate(() => navigator.serviceWorker.controller?.scriptURL.endsWith('/everyone/sw.js'))), 15000);
+  await page.goto(PUBLIC);
+  await page.locator('.day-head h1').waitFor();
   assert.deepEqual(await page.evaluate(() => window.prayerTracker.store.state.lists.map((l) => l.id)), ['anglican', 'parish', 'requests', 'family', 'prayers']);
   assert.equal(await page.locator('.office').count(), 0); // no Morning Prayer lists
   assert.ok(await page.locator('.group[data-list=anglican] .item-text').count() >= 1);
@@ -1456,6 +1461,25 @@ await step('Wisconsin: the diocese’s monthly and daily cycles are there from t
   const titles = (await texts('.settings-card h2')).map((t) => t.toLowerCase());
   assert.ok(titles.includes('lesser feasts and fasts') && !titles.includes('sync across devices') && !titles.includes('sharing with trinity'), `${titles}`);
   await shot('60-wisconsin-first-run');
+});
+
+await step('Wisconsin: a phone that copied the cycles as the diocese printed them takes up the changes since', async () => {
+  // As an earlier version left it: All Saints, Appleton as printed, and Micah Cronin's listing too, but edited here.
+  await page.evaluate(() => {
+    const key = 'prayer-tracker-wisconsin:data';
+    const s = JSON.parse(localStorage.getItem(key));
+    const find = (list, text) => s.lists.find((l) => l.id === list).items.find((i) => i.text === text);
+    Object.assign(find('diocese', 'All Saints, Appleton'), { note: 'Christopher Wilkerson, Rector', updated: Date.parse('2026-11-03T00:00:00Z') });
+    Object.assign(find('diocese-daily', 'Micah Cronin'), { note: 'Supply, St. Luke’s, Madison (and a note of mine)', updated: Date.parse('2026-11-05T00:00:00Z') });
+    localStorage.setItem(key, JSON.stringify(s));
+  });
+  await page.reload();
+  await page.locator('h1').first().waitFor();
+  const notes = await page.evaluate(() => {
+    const { store } = window.prayerTracker;
+    return [store.list('diocese').items.find((i) => i.text === 'All Saints, Appleton').note, store.list('diocese-daily').items.find((i) => i.text === 'Micah Cronin').note];
+  });
+  assert.deepEqual(notes, ['Cam Walker, Priest-in-Charge', 'Supply, St. Luke’s, Madison (and a note of mine)']);
 });
 
 await step('Eastern Ridges: the clergy every day, by last name; take your own name off, and it stays off', async () => {

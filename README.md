@@ -211,6 +211,19 @@ a look. A few listings needed judgment: the Northern Highlands Benefice clergy a
 at its four parishes (Hayward, Rice Lake, Spooner, Springbrook), and "Trinity, Wausau"
 in the 2026 daily cycle is Trinity, Wauwatosa.
 
+**Changes since the diocese published them.** The script also holds the moves it has
+heard of since (`MOVED` and `ADDED`), as of November 2026: Cam Walker is Priest-in-Charge
+of All Saints, Appleton (in place of Christopher Wilkerson, Rector); Mike Hackbarth is Vicar
+of St. John's, New London (in place of Portia Corbin, Priest-in-Charge), and no longer at
+St. Paul's Cathedral, Fond du Lac; and Micah Cronin is Dean of All Saints Cathedral,
+Milwaukee (in place of John Allen, Supply), and no longer Supply at St. Luke's, Madison.
+In the daily cycle, Mike Hackbarth's and Micah Cronin's listings show their new posts, and
+the three who left those posts are listed by name only. Each changed entry in
+`js/data/diocese.js` keeps how it read before (`was`) and when it changed, so a phone that
+copied the cycles earlier takes up the change the next time the app opens
+(`store.reviseSeed`), wherever its copy still reads as it did: an entry you have changed
+yourself is left as you have it, and one you deleted stays deleted.
+
 ### Setting up the other cycles
 
 **Another diocese's cycle.** Paste one church per line, each starting with its day number:

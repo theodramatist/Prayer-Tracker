@@ -1,7 +1,9 @@
 // The Episcopal Diocese of Wisconsin's cycles of prayer, built by
 // scripts/build-diocese.mjs from the diocese's 2026 Sunday-by-Sunday cycle and
-// its 2026 Daily Cycle of Prayer. On first use the app copies them into your
-// Diocesan Cycle and Diocesan Daily Cycle lists, where they can be edited.
+// its 2026 Daily Cycle of Prayer, with the changes since (each with `was`, how
+// it read before, and when it changed). On first use the app copies them into
+// your Diocesan Cycle and Diocesan Daily Cycle lists, where they can be edited;
+// a copy made earlier takes up each change wherever it still reads as it did.
 export default {
   id: "wis2026",
   diocese: "The Episcopal Diocese of Wisconsin",
@@ -10,7 +12,7 @@ export default {
   monthly: [
     {"day":1,"text":"Trinity, Mineral Point","note":"Christian Maxfield, Priest-in-Charge"},
     {"day":1,"text":"Ascension, Merrill","note":"Amy Heimerl, Priest-in-Charge · Linda Schmidt, Deacon"},
-    {"day":1,"text":"St. Paul’s Cathedral, Fond du Lac","note":"Mike Klusmeyer, (Bishop) Interim · Mike Hackbarth, Deacon"},
+    {"day":1,"text":"St. Paul’s Cathedral, Fond du Lac","note":"Mike Klusmeyer, (Bishop) Interim","was":{"note":"Mike Klusmeyer, (Bishop) Interim · Mike Hackbarth, Deacon"},"updated":1794009600000},
     {"day":2,"text":"St. John’s, Sparta","note":"Kathleen Charles, Long-term supply · Janet Leigh Sterken, Deacon"},
     {"day":2,"text":"St. Andrew’s, Monroe"},
     {"day":2,"text":"St. Mark’s, Milwaukee","note":"Don Fleischman, Priest-in-Charge · John Hickey, Associate · Michelle Mooney, Deacon"},
@@ -25,7 +27,7 @@ export default {
     {"day":5,"text":"St. Matthias, Waukesha","note":"David Simmons, Rector · Nancy Hodge, Deacon"},
     {"day":5,"text":"St. Peter’s, Fort Atkinson","note":"Melinda Valentine Davis, Rector"},
     {"day":5,"text":"Trinity, Wauwatosa","note":"Gary Manning, Rector"},
-    {"day":6,"text":"All Saints, Appleton","note":"Christopher Wilkerson, Rector"},
+    {"day":6,"text":"All Saints, Appleton","note":"Cam Walker, Priest-in-Charge","was":{"note":"Christopher Wilkerson, Rector"},"updated":1794009600000},
     {"day":6,"text":"St. Simon the Fisherman, Port Washington","note":"Julian Hills, Priest-in-Charge"},
     {"day":6,"text":"St. Paul’s, Ashippun","note":"Thomas Holtzen, Priest-in-Charge"},
     {"day":7,"text":"St. Peter’s, North Lake","note":"Stephen Capitelli, Long-term supply"},
@@ -53,7 +55,7 @@ export default {
     {"day":13,"text":"St. Barnabas, Clear Lake","note":"Philip Morgan, Long-term supply"},
     {"day":13,"text":"St. Michael’s, Racine","note":"Lars Skoglund, Rector · Lynn Zobel, Deacon"},
     {"day":13,"text":"St. Katherine’s, Owen","note":"George Stamm, Priest-in-Charge"},
-    {"day":14,"text":"All Saints Cathedral, Milwaukee","note":"John Allen, Supply"},
+    {"day":14,"text":"All Saints Cathedral, Milwaukee","note":"Micah Cronin, Dean","was":{"note":"John Allen, Supply"},"updated":1794009600000},
     {"day":14,"text":"Grace, Sheboygan","note":"William Bulson, Rector · Paul Aparicio, Deacon"},
     {"day":14,"text":"St. Alban’s, Superior","note":"Steven Burns, Priest-in-Charge"},
     {"day":15,"text":"Christ Church, La Crosse","note":"Michael McElwee, Rector"},
@@ -76,14 +78,14 @@ export default {
     {"day":19,"text":"St. Mark’s, Beaver Dam","note":"Mike Tess, Rector"},
     {"day":20,"text":"Atonement, Fish Creek"},
     {"day":20,"text":"Christ Church, Bayfield"},
-    {"day":20,"text":"St. Luke’s, Madison","note":"Micah Cronin, Supply"},
+    {"day":20,"text":"St. Luke’s, Madison","was":{"note":"Micah Cronin, Supply"},"updated":1794009600000},
     {"day":21,"text":"Christ Church, Chippewa Falls","note":"Rose Ruthy, Deacon"},
     {"day":21,"text":"Holy Cross, Wisconsin Dells","note":"Michael Caldwell, Rector · Brad Osborn, Deacon"},
     {"day":21,"text":"St. Thomas, Greendale","note":"Melesa McEwan Skoglund, Rector · Lisa Chmielewski, Deacon"},
     {"day":21,"text":"St. James, Manitowoc","note":"Brian Staude, Rector"},
     {"day":22,"text":"Christ Church, Whitefish Bay","note":"Seth Dietrich, Rector · Matt Phillips, Associate Rector · Nancy Hills, Deacon"},
     {"day":22,"text":"St. John’s, Wausau","note":"Samuel Cripps, Rector"},
-    {"day":22,"text":"St. John’s, New London","note":"Portia Corbin, Priest-in-Charge"},
+    {"day":22,"text":"St. John’s, New London","note":"Mike Hackbarth, Vicar","was":{"note":"Portia Corbin, Priest-in-Charge"},"updated":1794009600000},
     {"day":23,"text":"Holy Communion, Lake Geneva","note":"Ryan Robinson Delaney, Rector"},
     {"day":23,"text":"St. Mary’s, Tomah","note":"Guy Usher, Rector · Irene McDaniel, Deacon · Mary Rezin, Deacon"},
     {"day":23,"text":"Holy Apostles, Oneida","note":"James Biegler, Priest-in-Charge"},
@@ -157,7 +159,7 @@ export default {
     {"date":"2026-02-14","text":"Andrew Cruz Lillegard","note":"Rector, St. Thomas, Menasha"},
     {"date":"2026-02-16","text":"Sean Rowe","note":"Presiding Bishop"},
     {"date":"2026-02-17","text":"Stephen Capitelli","note":"Long-term supply, St. Peter’s, North Lake"},
-    {"date":"2026-02-18","text":"John Allen","note":"Supply, All Saints Cathedral, Milwaukee"},
+    {"date":"2026-02-18","text":"John Allen","was":{"note":"Supply, All Saints Cathedral, Milwaukee"},"updated":1794009600000},
     {"date":"2026-02-19","text":"Bobbi Kraft","note":"Priest Chaplain, St. Francis Student Center, UW Madison"},
     {"date":"2026-02-20","text":"Paul Feider","note":"Retired Priest"},
     {"date":"2026-02-21","text":"Larry Burton","note":"Priest, canonically resident"},
@@ -172,7 +174,7 @@ export default {
     {"date":"2026-03-04","text":"Brian Staude","note":"Rector, St. James, Manitowoc"},
     {"date":"2026-03-05","text":"Brad Osborn","note":"Deacon, Holy Cross, WI Dells"},
     {"date":"2026-03-06","text":"Gary Manning","note":"Rector, Trinity, Wauwatosa"},
-    {"date":"2026-03-07","text":"Christopher Wilkerson","note":"Rector, All Saints, Appleton"},
+    {"date":"2026-03-07","text":"Christopher Wilkerson","was":{"note":"Rector, All Saints, Appleton"},"updated":1794009600000},
     {"date":"2026-03-09","text":"Julie Hendrix","note":"Rector, St. Mark’s, Waupaca"},
     {"date":"2026-03-10","text":"Deb Woolsey","note":"Rector, St. Matthias, Minocqua"},
     {"date":"2026-03-11","text":"Monica Burkert-Brist","note":"Rector, St. Paul’s Watertown"},
@@ -259,7 +261,7 @@ export default {
     {"date":"2026-06-16","text":"Heather Hill","note":"Rector, St. Paul’s, Hudson"},
     {"date":"2026-06-17","text":"Brien Beck","note":"Deacon, St. Barnabas, Suamico"},
     {"date":"2026-06-18","text":"Nicci Beeck","note":"Deacon, St. Paul’s, Plymouth"},
-    {"date":"2026-06-19","text":"Portia Corbin","note":"Priest-in-Charge, St. John’s, New London"},
+    {"date":"2026-06-19","text":"Portia Corbin","was":{"note":"Priest-in-Charge, St. John’s, New London"},"updated":1794009600000},
     {"date":"2026-06-20","text":"Bob Bagley","note":"Deacon, St. Luke’s, Racine"},
     {"date":"2026-06-22","text":"Mary Trainor","note":"Retired Priest"},
     {"date":"2026-06-23","text":"Patrick Rudolph","note":"Retired Deacon"},
@@ -377,12 +379,12 @@ export default {
     {"date":"2026-11-02","text":"Esther Kramer","note":"Rector, St. Aiden’s, Hartford"},
     {"date":"2026-11-03","text":"Lynn Zobel","note":"Deacon, St. Michael’s, Racine"},
     {"date":"2026-11-04","text":"Chuck Daily","note":"Retired Priest"},
-    {"date":"2026-11-05","text":"Mike Hackbarth","note":"Deacon, St. Paul’s Cathedral, Fond du Lac"},
+    {"date":"2026-11-05","text":"Mike Hackbarth","note":"Vicar, St. John’s, New London","was":{"note":"Deacon, St. Paul’s Cathedral, Fond du Lac"},"updated":1794009600000},
     {"date":"2026-11-06","text":"Julian Hills","note":"Priest-in-Charge, St. Simon’s, Port Washington"},
     {"date":"2026-11-07","text":"Geoff Ward","note":"Rector, St. Christopher’s, River Hills"},
     {"date":"2026-11-09","text":"Tyler Richards","note":"Dean, Christ Church Cathedral, Eau Claire"},
     {"date":"2026-11-10","text":"Vicki Natzke","note":"Retired Priest"},
-    {"date":"2026-11-11","text":"Micah Cronin","note":"Supply, St. Luke’s, Madison"},
+    {"date":"2026-11-11","text":"Micah Cronin","note":"Dean, All Saints Cathedral, Milwaukee","was":{"note":"Supply, St. Luke’s, Madison"},"updated":1794009600000},
     {"date":"2026-11-12","text":"Ken Castello","note":"Deacon, St. Francis, Menomonee Falls"},
     {"date":"2026-11-13","text":"Mary Lynn Adams","note":"Deacon, St. Anne’s, De Pere"},
     {"date":"2026-11-14","text":"Cliff Perkins","note":"Deacon, Good Shepherd, Sun Prairie"},

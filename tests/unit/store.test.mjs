@@ -526,6 +526,84 @@ test('the real diocesan cycles: every church on a day of the month, a name for m
   assert.equal(new Set(daily.items.map((i) => i.id)).size, 307);
 });
 
+// The same cycle, changed since: each changed entry says how it read before, and when it changed.
+const REVISED = Date.parse('2026-11-07T00:00:00Z');
+const SEED_REVISED = {
+  ...SEED,
+  lists: [
+    { ...SEED.lists[0], entries: [
+      { key: 'm1', day: 1, text: 'St. A’s, Ayton', note: 'Ben Baker, Priest-in-Charge', was: { note: 'Ann Able, Rector' }, updated: REVISED },
+      { key: 'm2', day: 2, text: 'St. B’s, Beeton', note: 'Cy Cole, Vicar', was: { note: null }, updated: REVISED },
+    ] },
+    { ...SEED.lists[1], entries: [
+      { key: '2026-11-03', date: '2026-11-03', text: 'Lynn Zobel', was: { note: 'Deacon' }, updated: REVISED },
+    ] },
+  ],
+};
+const shape = (store) => ['diocese', 'diocese-daily'].flatMap((id) => store.list(id).items.map((i) => [i.id, i.text, i.note, i.created, i.updated]));
+
+test('a copy made before the diocese’s cycles changed takes up each change, as a new copy has it', () => {
+  const store = new Store(memoryStorage(), { clock: () => Date.parse('2026-11-05T12:00:00Z') });
+  assert.equal(store.reviseSeed(SEED_REVISED), 0); // nothing copied yet
+  store.seed(SEED);
+  assert.equal(store.reviseSeed(SEED_REVISED), 3);
+  assert.deepEqual(store.list('diocese').items.map((i) => i.note), ['Ben Baker, Priest-in-Charge', 'Cy Cole, Vicar']);
+  assert.equal(store.list('diocese-daily').items[0].note, undefined);
+  assert.equal(store.reviseSeed(SEED_REVISED), 0); // once
+  // Exactly as a device copying the changed cycle has it, so the two agree when they sync.
+  const fresh = new Store(memoryStorage(), { clock: () => Date.parse('2026-11-08T12:00:00Z') });
+  fresh.seed(SEED_REVISED);
+  assert.deepEqual(shape(store), shape(fresh));
+  assert.ok(shape(store).every(([, , , , updated]) => updated === REVISED));
+});
+
+test('your own edits to the copy, and what you deleted from it, are kept when the cycle changes', () => {
+  let now = Date.parse('2026-11-05T12:00:00Z');
+  const store = new Store(memoryStorage(), { clock: () => now });
+  store.seed(SEED);
+  store.updateItem('seed-test2026-m1', { note: 'Ann Able, Rector (on sabbatical)' });
+  store.deleteItem('seed-test2026-2026-11-03');
+  now += 864e5;
+  assert.equal(store.reviseSeed(SEED_REVISED), 1);
+  assert.deepEqual(store.list('diocese').items.map((i) => i.note), ['Ann Able, Rector (on sabbatical)', 'Cy Cole, Vicar']);
+  assert.deepEqual(store.list('diocese-daily').items, []);
+});
+
+test('the diocesan cycles as they are now: Cam Walker, Mike Hackbarth and Micah Cronin, on a new copy and an earlier one', async () => {
+  const { SEEDS } = await import('../../js/seeds.js');
+  const seed = SEEDS[0];
+  const fresh = new Store(memoryStorage(), { clock: () => Date.parse('2026-11-07T14:00:00Z') });
+  fresh.seed(seed);
+  const note = (store, text) => store.list('diocese').items.find((i) => i.text === text).note;
+  assert.equal(note(fresh, 'All Saints, Appleton'), 'Cam Walker, Priest-in-Charge');
+  assert.equal(note(fresh, 'St. John’s, New London'), 'Mike Hackbarth, Vicar');
+  assert.equal(note(fresh, 'All Saints Cathedral, Milwaukee'), 'Micah Cronin, Dean');
+  assert.equal(note(fresh, 'St. Paul’s Cathedral, Fond du Lac'), 'Mike Klusmeyer, (Bishop) Interim');
+  assert.equal(note(fresh, 'St. Luke’s, Madison'), undefined);
+  const on = (store, k) => itemsDue(store.list('diocese-daily'), k).map((i) => [i.text, i.note]);
+  assert.deepEqual(on(fresh, '2026-11-05'), [['Mike Hackbarth', 'Vicar, St. John’s, New London']]);
+  assert.deepEqual(on(fresh, '2026-11-11'), [['Micah Cronin', 'Dean, All Saints Cathedral, Milwaukee']]);
+  assert.deepEqual(on(fresh, '2026-06-19'), [['Portia Corbin', undefined]]);
+  // A phone that copied the cycles as the diocese printed them (before 2.14) takes up all ten changes.
+  const printed = {
+    ...seed,
+    lists: seed.lists.map((part) => ({
+      ...part,
+      entries: part.entries.map(({ was, updated, ...e }) => {
+        if (!was) return e;
+        const before = { ...e, ...was };
+        if (before.note == null) delete before.note;
+        return before;
+      }),
+    })),
+  };
+  const earlier = new Store(memoryStorage(), { clock: () => Date.parse('2026-11-06T14:00:00Z') });
+  earlier.seed(printed);
+  assert.equal(note(earlier, 'All Saints, Appleton'), 'Christopher Wilkerson, Rector');
+  assert.equal(earlier.reviseSeed(seed), 10);
+  assert.deepEqual(shape(earlier), shape(fresh));
+});
+
 // ---------- Morning Prayer lists and your own prayer ----------
 
 test('Trinity is read at Morning Prayer a weekday at a time, and comes up whole every day in your own prayer', () => {
